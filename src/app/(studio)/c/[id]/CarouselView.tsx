@@ -22,7 +22,7 @@ const DESIGN_STARTER: DesignSlide = {
   name: 'big number',
   html: '<div class="stat">\n  <span class="key">Tip</span>\n  <div class="num">10<span class="unit">x</span></div>\n  <h2>Faster with <span class="mark">one change</span></h2>\n  <p>Explain the number in one short line.</p>\n</div>',
   css: '.stat { position: absolute; inset: 64px; display: flex; flex-direction: column; justify-content: center; gap: 24px; }\n.num { font-size: 360px; line-height: 1; font-weight: 700; color: var(--primary); }\n.unit { font-size: 160px; }\nh2 { font-size: 72px; line-height: 1.1; margin: 0; color: var(--ink); }\np { font-size: 36px; color: var(--ink); margin: 0; }',
-  chrome: 'auto',
+  chrome: 'none',
 };
 
 // Templates were removed: new slides are always designed (blank canvas).

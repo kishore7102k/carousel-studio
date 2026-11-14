@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Text fields support two inline marks:  *phrase*  → the brand marker (use ONE per slide),  `code` → inline code.
+// Legacy template text fields support two inline marks:  *phrase*  → the marker,  `code` → inline code.
 const text = (d: string) => z.string().min(1).describe(d);
 
 export const CoverSlide = z.object({
@@ -46,8 +46,8 @@ export const DesignSlide = z.object({
   kind: z.literal('design'),
   html: z.string().min(1).max(60_000).describe('Slide body HTML (no <html>/<head>/<script>). 1080x1350 canvas, brand CSS variables and classes available. See get_brand_guide "Designing slides".'),
   css: z.string().max(30_000).optional().describe('CSS for this slide only (scoped by the studio).'),
-  chrome: Chrome.optional().describe('Brand chrome drawn by the studio: auto (default: handle + counter), handle, counter, none.'),
-  ground: Ground.optional().describe('Slide ground: paper (default, light), primary (brand color, like covers) or dark (code-bg). Sets background, text color and chrome colors.'),
+  chrome: Chrome.optional().describe('Studio footer: none (default; place the handle yourself), auto (handle + counter), handle, counter. Opt-in, not on every slide by habit.'),
+  ground: Ground.optional().describe('Optional base ground helper: paper (default, light), primary (brand green) or dark. Most designs set their own palette in css instead.'),
   name: z.string().max(80).optional().describe('Short label for humans, e.g. "big number", "comparison".'),
   notes: z.string().max(2000).optional().describe('Design intent; not rendered.'),
 });
@@ -89,19 +89,19 @@ export const SlideInputs = z.array(SlideInput).min(2).max(10).describe('5 to 8 s
 export const SLIDE_FORMAT_GUIDE = `Every slide is { kind: "design", html, css?, chrome?, ground?, name?, notes? }: a slide you design yourself in HTML/CSS on the brand layer
 (or { kind: "design", layout, fill } from a layout saved earlier). There are no templates. See "Designing slides" / get_design_system; check each slide with preview_slide.
 Older carousels may still contain legacy template slides (cover, content, code, cta): they keep rendering, but new or replaced slides must be design slides (get_slide_source converts one).
-In html, <mark>phrase</mark> is the brand highlighter (ONE per slide), <code>x</code> is inline code. In layout fill values use *phrase* and \`code\`.
+In html, <mark>phrase</mark> is an optional highlighter (at most one per slide, restyle it to your palette), <code>x</code> is inline code. In layout fill values use *phrase* and \`code\`.
 Limits: 5-8 slides, ~25 words per slide, code lines <= 32 chars. No em dashes, no emoji.`;
 
 /** Blank canvas for a new carousel started in the studio: two design slides to replace with a real design. */
 export const starterSlides = (): Slide[] => [
   {
-    kind: 'design', name: 'start here', ground: 'primary', chrome: 'auto',
+    kind: 'design', name: 'start here', ground: 'dark', chrome: 'none',
     html: '<h1 class="t-hook">Your <mark>idea</mark> here</h1>',
     css: '&{justify-content:center}',
     notes: 'Blank canvas. Ask an agent to design this carousel, or edit the HTML/CSS yourself.',
   },
   {
-    kind: 'design', name: 'blank', ground: 'paper', chrome: 'auto',
+    kind: 'design', name: 'blank', ground: 'paper', chrome: 'none',
     html: '<p class="t-title">Design this slide</p>',
     css: '&{justify-content:center;align-items:center;text-align:center}',
   },

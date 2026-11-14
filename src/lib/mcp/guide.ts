@@ -2,7 +2,7 @@ import { getBrand } from '@/lib/brand';
 import { SLIDE_FORMAT_GUIDE } from '@/lib/slides';
 
 export const WORKFLOW = `Carousel Studio workflow for agents:
-1. Call get_brand_guide once per session and follow it (voice, one marked phrase per slide, limits).
+1. Call get_brand_guide once per session and follow it (voice, limits, and "Designing slides": your own concept, palette and layouts for every carousel).
 2. list_requests shows what the human asked for: "note" = feedback pinned on a slide (slide = 1-based number, x/y as 0-1 fractions of the image), "new" = make a new carousel from the text.
 3. claim_request before working on one (another agent may hold it; leases expire after 30 min).
 4. Make the change:
@@ -19,9 +19,17 @@ Conventions:
 - Status (draft → review → approved → posted) belongs to the human; agents normally leave it alone. Edits set it back to review.
 - Every write is recorded in the activity log (list_activity) under your key's name.`;
 
-/** The brand README without its "## Template: …" sections: those describe fixed slide layouts, which agents copy. */
+/**
+ * The brand README, minus everything that makes every carousel look the same: the "## Template: …" sections
+ * (fixed slide layouts) and the visual rules about colour use, signature moves, layout, radii and motion
+ * (e.g. "covers are Racing Green"). Kept: voice/content, type, fonts, logo. Each carousel picks its own palette.
+ */
+const DROP_SUBSECTIONS = /^### (Colou?r|Signature moves|Layout and spacing|Radii, borders, elevation|Motion)\b/;
 export function brandReadme(readme: string) {
-  return readme.split(/\n(?=## )/).filter(sec => !/^## Template:/.test(sec.trim())).join('\n').trim();
+  return readme
+    .split(/\n(?=## )/).filter(sec => !/^## Template:/.test(sec.trim()))
+    .map(sec => sec.split(/\n(?=### )/).filter(sub => !DROP_SUBSECTIONS.test(sub.trim())).join('\n'))
+    .join('\n').trim();
 }
 
 /** Workflow + slide format + active brand README. Same text for the tool, the resource and the prompts. */
@@ -29,22 +37,25 @@ export async function brandGuideText() {
   const b = await getBrand();
   let designing = '';
   try { designing = `\n\n${await designingGuideText()}`; } catch { /* design system not available: guide still works */ }
-  return `${WORKFLOW}\n\n# Slide format\n${SLIDE_FORMAT_GUIDE}${designing}\n\n# Brand: ${b.name}\nHandle: ${b.handle}. Series label prefix (optional): "${b.labelPrefix}".\nThe brand gives you colors, fonts, voice and a few signature touches. It does NOT give you layouts: every carousel gets its own design.\n\n${brandReadme(b.readme)}`;
+  return `${WORKFLOW}\n\n# Slide format\n${SLIDE_FORMAT_GUIDE}${designing}\n\n# Brand: ${b.name}\nHandle: ${b.handle} (show it once or twice per carousel, where it fits). Series label prefix (optional, rarely needed): "${b.labelPrefix}".\nThe brand gives you its FONTS and its VOICE. It does NOT give you colors or layouts: every carousel gets its own palette and its own design.\nWhere the brand book below describes a look (a color like racing green, paper pages, a highlighted phrase), read it as one past style the brand has used, not a rule. Take its voice, type and font guidance; ignore its color and layout prescriptions.\n\n${brandReadme(b.readme)}`;
 }
 
 const THINKING = `## Think like a designer (this is the job, not filling a template)
 There are no slide templates. You design every slide of every carousel.
 
 1. Understand the idea first: what is the ONE thing the reader should remember? What is the story arc (hook, tension, insight, proof, takeaway)?
-2. Pick a visual concept for THIS carousel before writing any HTML, and write it in the first slide's "notes" (e.g. "a terminal session", "a lab notebook", "a scoreboard", "a field guide", "a map with checkpoints", "a magazine spread", "a receipt", "an x-ray of the code"). The concept drives layout, scale, rhythm and the grounds you use.
+2. Pick a visual concept for THIS carousel before writing any HTML, and write it in the first slide's "notes" (e.g. "a terminal session", "a lab notebook", "a scoreboard", "a field guide", "a map with checkpoints", "a magazine spread", "a receipt", "an x-ray of the code"). The concept drives layout, scale, rhythm and color.
+   Then pick a PALETTE for this carousel that fits the concept (3 to 5 colors: background, text, one or two accents, a surface), e.g. amber on near-black for a terminal, signal red on off-white for an editorial, cyan lines on deep blue for a blueprint, warm kraft and ink for a notebook. Do not default to the brand green: it is just one option. Define the palette as CSS variables at the top of EVERY slide's css so it stays consistent, e.g. "&{--bg:#101418;--fg:#f4efe6;--accent:#ffb000;--muted:#8a8f98;background:var(--bg);color:var(--fg)}", and restyle helpers to match (e.g. "mark{background:var(--accent);color:var(--bg)}", ".card{background:...}", ".editor{background:...}"). Write the palette in the first slide's notes too. Keep text readable (WCAG AA contrast is checked).
 3. Plan the sequence: one idea per slide, and choose each slide's layout from its content (a number becomes a hero number, a process becomes steps or a timeline, a trade-off becomes a split, code becomes an annotated editor, a mistake becomes a crossed-out row next to the fix).
 4. Design, preview_slide, look at the image critically, and iterate: hierarchy, balance (no empty bottom half), alignment, breathing room, contrast. Warnings are the floor, not the goal.
 
 Variety rules:
 - Do not reuse the same structure for every carousel. A cover is not always "small label top, big hook bottom": try a giant word, a question, a split, a code fragment, a number, a diagram, a full-bleed color field.
-- Adjacent slides should not share the same layout. Vary scale (huge vs small type), density, grounds (paper, primary, dark, surface) and alignment (left, centered, asymmetric).
-- Signature touches (the marker, the keycap, the live dot, the handle footer) are optional accents, not a skeleton. Use the marker on at most one phrase per slide; use the others only when they help.
-- The series label ("Tip 014") is optional. chrome defaults to auto (handle + counter); set chrome "none" or "handle" when your design shows the handle its own way.
+- Adjacent slides should not share the same layout. Vary scale (huge vs small type), density, background treatment and alignment (left, centered, asymmetric).
+- Different carousels must not look alike: different palette, different concept, different cover idea. Never reuse the previous carousel's colors.
+- No default decorations. Do NOT add these by habit: a footer on every slide, a highlighted (<mark>) phrase on every slide, small monospace kicker labels ("USE 01", "THE CSS ISSUE"), keycap tags, a "Tip 014" label. Use one only when this specific design needs it (a highlighter on 1 or 2 slides of the carousel at most).
+- The handle: put it where it fits the design, at least on the first or last slide (e.g. a small signature on the cover, or part of the closing slide). chrome defaults to "none"; the studio footer (chrome "auto" / "handle") is opt-in.
+- There is no rule about cover or closing colors: a cover can be any color, any style.
 
 Layout ideas (combine and invent; never copy blindly): hero number with a tiny caption; question and answer split across the slide; two-column before/after or myth/fact; vertical timeline or numbered steps; checklist with checked and crossed rows; annotated code with callout labels; a small diagram in inline SVG (boxes, arrows, flow); a "receipt" or "terminal" mock; a quote card; a scale or meter; a grid of 4 small cards; a single giant word; a mistake row struck through next to the correct row; a map of where something happens (client, server, edge).
 
@@ -61,7 +72,7 @@ export async function designingGuideText() {
   const type = d.typeScale.map(t => `- ${t.name}: ${t.size} / ${t.weight}, ${t.use}`).join('\n');
   const kv = (o: Record<string, string>) => Object.entries(o).map(([k, v]) => `${k}=${v}`).join(', ');
   return `# Designing slides
-Every slide is designed by you: { kind: "design", html, css?, chrome?, ground?, name?, notes? }. The brand supplies colors, fonts, spacing and a few signature touches; you supply the concept and the layout.
+Every slide is designed by you: { kind: "design", html, css?, chrome?, ground?, name?, notes? }. The brand supplies its fonts and voice (and spacing/type scale helpers); you supply the concept, the palette and the layout.
 
 ${THINKING}
 
@@ -75,12 +86,13 @@ ${THINKING}
 Images: upload_asset (PNG/JPEG/WebP/SVG, 2 MB) and use the returned url in <img src>. Inline <svg> and data: URIs work too. Nothing else loads: JavaScript is off and the network is blocked, so no external fonts, images or CSS.
 
 ## Canvas
-${d.canvas.width}x${d.canvas.height}px. Keep content inside the ${d.canvas.safeInset}px safe area (the studio draws the handle and "n / total" chrome there). Flow content inside the slide root (see rules); use flex or grid.
-Fonts: sans = ${d.fonts.sans}; mono = ${d.fonts.mono} (code and labels only).
+${d.canvas.width}x${d.canvas.height}px. Keep content inside the ${d.canvas.safeInset}px safe area. Flow content inside the slide root (see rules); use flex or grid.
+Fonts (the one fixed brand element): sans = ${d.fonts.sans}; mono = ${d.fonts.mono} (code and technical text).
 Spacing: ${kv(d.spacing)}. Radii: ${kv(d.radii)}.
-Chrome (set "chrome"): ${d.chrome.join(', ')}. Default auto = handle footer + counter. Use none for full-bleed designs.
+Chrome (set "chrome"): ${d.chrome.join('; ')}.
 
-## CSS variables (use these, not hex values)
+## CSS variables (helpers, NOT a required palette)
+The brand's own colors are available as variables if a carousel's concept suits them, but each carousel should define its own palette (see above) and is free to ignore these.
 ${vars}
 
 ## Brand classes
@@ -91,7 +103,7 @@ ${type}
 
 ## Rules (the checks behind errors and warnings)
 ${d.rules.map(r => `- ${r}`).join('\n')}
-- ONE <mark> / *marker* phrase per slide. Text of 24px or more only. Brand fonts and palette colors only. Keep text contrast at WCAG AA.
+- Text of 24px or more only. Brand fonts only. Any colors (your carousel palette); keep text contrast at WCAG AA. At most one <mark> per slide, and only when it helps.
 - In html, write marker as <mark>phrase</mark>; in layout fill values use *phrase* and \`code\`.
 - Do not use em dashes or emoji (brand voice).`;
 }

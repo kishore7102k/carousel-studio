@@ -143,7 +143,7 @@ async function main() {
     const pf = await preview(A, OFF);
     const w = warningsOf(pf);
     check('preview off-brand: no errors', pf.ok && errorsOf(pf).length === 0, pf.text.slice(0, 300));
-    check('preview off-brand: color warning', w.some(x => /colou?r/i.test(x)), w.join(' | ') || pf.text.slice(0, 200));
+    check('preview custom palette: no palette warning (colors are free)', !w.some(x => /palette/i.test(x)), w.join(' | ') || pf.text.slice(0, 200));
     check('preview off-brand: font warning', w.some(x => /font/i.test(x)), w.join(' | ') || pf.text.slice(0, 200));
 
     // ---- assets ----

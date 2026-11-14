@@ -118,29 +118,7 @@ function inPage(o: LintOptions): Lint {
     const d = ctx.getImageData(0, 0, 1, 1).data;
     return [d[0], d[1], d[2], d[3] / 255];
   };
-  const hex = (c: number[]) => '#' + c.slice(0, 3).map(v => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('') + (c[3] < 1 ? ` at ${Math.round(c[3] * 100)}%` : '');
-  const inPalette = (c: [number, number, number, number]) => {
-    if (c[3] < 0.03) return true;
-    const tol = c[3] >= 0.5 ? 3 : 10;
-    return o.palette.some(p => c[3] <= p[3] + 0.1 && Math.abs(p[0] - c[0]) <= tol && Math.abs(p[1] - c[1]) <= tol && Math.abs(p[2] - c[2]) <= tol);
-  };
-  const offBrand = new Map<string, string>();
-  const check = (value: string, el: Element, what: string) => {
-    const c = rgba(value);
-    if (c && !inPalette(c)) { const k = hex(c); if (!offBrand.has(k)) offBrand.set(k, `${what} of ${desc(el)}`); }
-  };
-  for (const el of [root, ...Array.from(root.querySelectorAll('*'))]) {
-    const cs = getComputedStyle(el);
-    if (cs.display === 'none') continue;
-    if (texts.has(el)) check(cs.color, el, 'text');
-    check(cs.backgroundColor, el, 'background');
-    for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
-      if (parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') check(cs[`border${side}Color`], el, 'border');
-    }
-    if (el instanceof SVGElement && /^(path|rect|circle|ellipse|line|polyline|polygon|text|tspan)$/.test(el.tagName)) { if (cs.fill !== 'none') check(cs.fill, el, 'fill'); if (cs.stroke !== 'none') check(cs.stroke, el, 'stroke'); }
-  }
-  for (const [c, where] of [...offBrand].slice(0, 5)) warnings.push(`color ${c} is not in the brand palette (${where}); use the CSS variables`);
-  if (offBrand.size > 5) warnings.push(`${offBrand.size - 5} more off-palette colors`);
+  // No palette check: each carousel picks its own colors (maintainer decision 2026-11-15). Only contrast is enforced below.
 
   // ---- one marker ----
   const marks = root.querySelectorAll('mark').length;

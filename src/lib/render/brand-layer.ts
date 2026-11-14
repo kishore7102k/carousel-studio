@@ -240,7 +240,7 @@ export function chromeHtml(chrome: Chrome, ground: Ground, n: number, total: num
 export const CLASSES: { name: string; example: string; use: string }[] = [
   { name: '.paper / .primary / .dark / .surface', example: '<div class="card primary">…</div>', use: 'Grounds: background + matching text color. The whole slide ground is the "ground" option (paper default)' },
   { name: '.t-hook .t-title .t-caption .t-body .t-code .t-label', example: '<h1 class="t-hook">Ship <mark>less</mark> JS</h1>', use: 'Type scale (font, size, weight, line height, tracking)' },
-  { name: 'mark', example: '<mark>one phrase</mark>', use: 'The brand marker. ONE per slide, on the key phrase' },
+  { name: 'mark', example: '<mark>one phrase</mark>', use: 'Optional highlighter for a key phrase: at most one per slide and only on 1 or 2 slides of a carousel; restyle it to your palette (mark{background:...;color:...})' },
   { name: '.key', example: '<span class="key">Tip 014</span>', use: 'Keycap label (mono, thick bottom edge), top-left of covers' },
   { name: '.chip', example: '<span class="chip">Before</span>', use: 'Small pill label for tags, steps, before/after' },
   { name: '.dot', example: '<span class="dot"></span>@handle', use: 'Live dot before the handle (bright on dark grounds, accent on paper)' },
@@ -256,10 +256,10 @@ export const CLASSES: { name: string; example: string; use: string }[] = [
 ];
 
 export const CHROME_DOC = [
-  'auto: live dot + handle bottom-left, "n / total" bottom-right (default, like the templates)',
-  'handle: only the handle',
-  'counter: only "n / total"',
-  'none: nothing (draw your own or go full-bleed)',
+  'none: nothing (DEFAULT). Place the handle yourself where it fits your design, at least on the first or last slide',
+  'auto: studio footer with live dot + handle bottom-left and "n / total" bottom-right (opt-in; do not use it on every slide by habit)',
+  'handle: studio footer with only the handle',
+  'counter: studio footer with only "n / total"',
 ];
 
 export const DESIGN_RULES = [
@@ -268,5 +268,5 @@ export const DESIGN_RULES = [
   'Your css is scoped to the slide: every selector is prefixed with the slide root. Target the root itself with &, :root, html, body or .slide (e.g. "&{padding:64px}").',
   'No JavaScript; all network is blocked except data: URIs and uploaded assets (upload_asset). <script>, <iframe>, <object>, <embed>, <link>, <meta>, <base>, <form>, on* attributes, javascript: URLs, remote url() and @import are removed.',
   `Error (saving refused): text or images outside the ${W}x${H} canvas.`,
-  `Warnings: content outside the ${SAFE}px safe area, text clipped by its container, text overlapping the footer chrome, text under 24px, non-brand fonts, colors outside the brand palette, more than one <mark>, text contrast below WCAG AA (4.5:1; 3:1 for text >= 64px or bold >= 48px).`,
+  `Warnings: content outside the ${SAFE}px safe area, text clipped by its container, text overlapping the footer chrome, text under 24px, non-brand fonts, more than one <mark>, text contrast below WCAG AA (4.5:1; 3:1 for text >= 64px or bold >= 48px). Colors are free: there is no palette check.`,
 ];

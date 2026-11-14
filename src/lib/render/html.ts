@@ -103,7 +103,8 @@ export function designHtml(slide: DesignSlide, i: number, total: number, tipLabe
   const html = sanitizeHtml(slide.html);
   const css = sanitizeCss([slide.css ?? '', ...html.styles].join('\n'), { scope: true });
   const ground = slide.ground ?? 'paper';
-  const chrome = slide.chrome ?? 'auto';
+  // Default: no footer. The designer places the handle where it fits (a footer on every slide read as a template).
+  const chrome = slide.chrome ?? 'none';
   const cls = `slide design ${ground}${chrome === 'none' ? '' : ' with-foot'}`;
   const vars = `--tip:${cssString(tipLabel)};--handle:${cssString(brand.handle)}`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>${LOCK}${brandCss(brand)}${designLayerCss(brand)}</style><style>${css.css}</style></head>`
