@@ -2,6 +2,7 @@
 import { and, count, eq, gte, lt, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import { SCOPES, hashSecret, newSecret, redirectUriProblem } from './core';
+import { fetchClientMetadata, isCimdClientId } from './cimd';
 
 export type OAuthClient = typeof schema.oauthClients.$inferSelect;
 export type TokenAuthMethod = OAuthClient['tokenAuthMethod'];
@@ -12,14 +13,30 @@ export const MAX_NAME_BYTES = 2048;
 const MAX_URI_LENGTH = 2048;
 const DEFAULT_NAME = 'MCP client';
 
+const CIMD_TTL_MS = 24 * 60 * 60 * 1000;
+
 /**
- * The client for a `client_id`: a registered (DCR) client, or — when client_id is an https URL — its
- * metadata document (fetched SSRF-safely and cached 24 h). null when unknown or the document is invalid.
- * Phase 2 item 5 adds the CIMD branch; today this only finds registered clients.
+ * The client for a `client_id`: a registered (DCR) client, or, when client_id is an https URL, its
+ * metadata document (fetched SSRF-safely, cached in oauth_clients as source 'cimd' for 24 h).
+ * null when unknown, or when the document cannot be fetched or is invalid (a stale cache is never served).
  */
 export async function resolveClient(clientId: string): Promise<OAuthClient | null> {
-  const [c] = await getDb().select().from(schema.oauthClients).where(eq(schema.oauthClients.clientId, clientId));
-  return c ?? null;
+  const c = schema.oauthClients;
+  const [row] = await getDb().select().from(c).where(eq(c.clientId, clientId));
+  if (!isCimdClientId(clientId)) return row ?? null;
+  if (row && row.source !== 'cimd') return null; // never: DCR ids are scl_…
+  if (row?.metadataFetchedAt && Date.now() - row.metadataFetchedAt.getTime() < CIMD_TTL_MS) return row;
+
+  const result = await fetchClientMetadata(clientId);
+  if (!result.ok) return null;
+  const m = result.metadata;
+  const values = {
+    name: m.name, redirectUris: m.redirectUris, logoUri: m.logoUri, clientUri: m.clientUri,
+    tokenAuthMethod: 'none' as const, secretHash: null, metadataFetchedAt: new Date(),
+  };
+  const [saved] = await getDb().insert(c).values({ clientId, source: 'cimd', ...values })
+    .onConflictDoUpdate({ target: c.clientId, set: values }).returning();
+  return saved ?? null;
 }
 
 // ---------- shared metadata validation (DCR body and CIMD documents) ----------
