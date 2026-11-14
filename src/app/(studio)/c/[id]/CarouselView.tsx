@@ -25,13 +25,8 @@ const DESIGN_STARTER: DesignSlide = {
   chrome: 'auto',
 };
 
-const blank: Record<string, Slide> = {
-  design: DESIGN_STARTER,
-  cover: { kind: 'cover', hook: 'New *hook*' },
-  content: { kind: 'content', title: 'New *title*', points: ['Point one', 'Point two'] },
-  code: { kind: 'code', file: 'example.ts', code: 'const x = 1;' },
-  cta: { kind: 'cta', hook: 'Save this for *later*.' },
-};
+// Templates were removed: new slides are always designed (blank canvas).
+const blank: Record<string, Slide> = { design: DESIGN_STARTER };
 
 type Act = { id: string; actor: string; action: string; createdAt: string };
 
@@ -148,11 +143,7 @@ export function CarouselView({ data, activity }: { data: Data; activity: Act[] }
             <div className="savebar">
               <select aria-label="Add slide" value="" onChange={e => { const k = e.target.value; if (k) setEditing([...editing.slice(0, -1), structuredClone(blank[k]), ...editing.slice(-1)]); }} style={{ width: 'auto' }}>
                 <option value="">+ Add slide…</option>
-                <option value="content">Content</option>
-                <option value="code">Code</option>
-                <option value="cover">Cover</option>
-                <option value="cta">CTA</option>
-                <option value="design">Design (blank)</option>
+                <option value="design">Blank design slide</option>
               </select>
               <input aria-label="What changed" placeholder="What changed (optional)" value={editNote} onChange={e => setEditNote(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
               <button className="btn primary" disabled={pending} onClick={save}>{pending ? 'Rendering…' : 'Save as new version'}</button>

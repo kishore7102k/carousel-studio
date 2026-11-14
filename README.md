@@ -6,8 +6,9 @@ You pin notes on slides ("code too small here"), and agents like Claude Code, Co
 
 - **Review UI**: gallery, slide viewer with pinned notes, text editing, versions, approve → posted.
 - **MCP server** at `/api/mcp`: create, edit, render and view carousels, and work a shared request queue with claim/lease so multiple agents never collide.
-- **Server-side rendering**: slides are HTML templates rendered to 1080×1350 PNGs by headless Chromium (Playwright locally, `@sparticuz/chromium` on Vercel), stored in Vercel Blob.
-- **Brand packs**: colors, fonts and voice live in the database and can be imported from a design-system `tokens.json`. Licensed fonts never enter the repo.
+- **Agent-designed slides**: there are no slide templates. Agents design every slide in HTML/CSS (their own concept and layouts) on your brand's colors, fonts and signature touches, preview it with automatic design checks, and save it.
+- **Server-side rendering**: slides are rendered to 1080×1350 PNGs by a locked-down headless Chromium (Playwright locally, `@sparticuz/chromium` on Vercel), stored in Vercel Blob.
+- **Brand packs**: colors, fonts and voice live in the database and can be imported from a design-system `tokens.json`. Licensed fonts never enter the repo. The brand never dictates layouts.
 
 ## How it works
 
@@ -17,8 +18,8 @@ You pin notes on slides ("code too small here"), and agents like Claude Code, Co
  Agents (MCP) ──▶ /api/mcp ────┘    renderer ───┴── Vercel Blob: rendered PNGs
 ```
 
-1. Ask for a carousel (prompt) or start from the template.
-2. An agent claims the request, writes slides with `create_carousel`, which renders them.
+1. Ask for a carousel (prompt) or start from a blank design canvas.
+2. An agent claims the request, designs the slides (concept, layouts, `preview_slide` until they look right) and saves them with `create_carousel`, which renders them.
 3. You click on a slide to pin a note. It lands in the queue.
 4. An agent claims it, edits the slide (`edit_slide` or `update_slides`: new version + render) and calls `complete_request` with a reply.
 5. You approve and post.
@@ -136,7 +137,7 @@ Slide numbers in every tool input and output are **1-based**. Every slide change
 | `search`, `fetch` | read | OpenAI-compatible search over carousels and requests (ids `carousel:<uuid>`, `request:<uuid>`). |
 | `get_design_system` | read | The brand layer as data: CSS variables, classes with examples, type scale, spacing, radii, lint rules. |
 | `preview_slide` | read | Render one slide without saving: the PNG plus `errors` / `warnings` from the design checks. |
-| `get_slide_source` | read | Any slide as an editable `design` slide (templates converted), to remix. |
+| `get_slide_source` | read | Any slide as editable `design` source (legacy template slides of older carousels are converted), to remix. |
 | `upload_asset`, `list_assets`, `delete_asset` | write / read / write | Images and SVGs (PNG, JPEG, WebP, SVG; max 2 MB; SVG sanitized) to use in design slides. |
 | `save_layout`, `list_layouts`, `get_layout`, `delete_layout` | write / read / read / write | Reusable design layouts with `{{placeholders}}`. |
 
@@ -156,7 +157,7 @@ With the dev server running (`npm run dev`), `npm run mcp:smoke` creates tempora
 
 ## Designed slides
 
-Besides the four templates, agents can design a slide themselves: `{ "kind": "design", "html": "…", "css": "…" }` on a 1080×1350 canvas. The studio adds the **brand layer**: your fonts, every brand color as a CSS variable (`--primary`, `--paper`, `--ink`, `--marker`…), type scale, spacing and radius variables, utility classes (`mark`, `.key`, `.chip`, `.card`, `pre.editor` with highlighting…) and the chrome (handle + `n / total`, option `chrome`). `ground` picks paper, primary or dark. The brand guide (`get_brand_guide`) teaches agents all of it with examples.
+Every slide is designed by the agent: `{ "kind": "design", "html": "…", "css": "…" }` on a 1080×1350 canvas. There are no templates: the old `cover` / `content` / `code` / `cta` kinds are rejected for new slides (older carousels that contain them still render, and `get_slide_source` converts them). The brand guide asks agents to pick a visual concept per carousel and vary layouts slide to slide, instead of following a formula. The studio adds the **brand layer**: your fonts, every brand color as a CSS variable (`--primary`, `--paper`, `--ink`, `--marker`…), type scale, spacing and radius variables, utility classes (`mark`, `.key`, `.chip`, `.card`, `pre.editor` with highlighting…) and the chrome (handle + `n / total`, option `chrome`). `ground` picks paper, primary or dark. The brand guide (`get_brand_guide`) teaches agents all of it with examples.
 
 The loop: `get_design_system` → write HTML/CSS → `preview_slide` → fix what the checks report → save with `create_carousel` / `update_slides` / `edit_slide`. Checks: text or images off the canvas block the save; outside the 64 px safe area, clipped text, overlap with the footer, text under 24 px, non-brand fonts, off-palette colors, more than one marker and low contrast are warnings, shown as a badge on the slide in the studio. Good designs can be saved as **layouts** (`{{placeholders}}`) and reused with `{ "kind": "design", "layout": "big-number", "fill": { … } }`.
 
@@ -165,15 +166,17 @@ Agent HTML runs in the server's browser, so rendering is locked down: page JavaS
 ## Slide format
 
 ```json
-[
-  { "kind": "cover", "hook": "Stop installing *date picker* libraries.", "sub": "Your browser already ships one." },
-  { "kind": "content", "title": "Why it beats a *library*", "points": ["Native picker on every phone", "Ships zero JavaScript"] },
-  { "kind": "code", "file": "date-input.html", "diff": true, "code": "- npm install react-datepicker\n+ <input type=\"date\">", "caption": "*Zero KB* added." },
-  { "kind": "cta", "hook": "Save this for your *next form*." }
-]
+{
+  "kind": "design",
+  "name": "hero number",
+  "ground": "paper",
+  "html": "<p class=\"t-label mono muted\">Libraries needed</p><div class=\"num\">0</div><h2 class=\"t-title push\">The fix is <mark>built in</mark></h2>",
+  "css": ".num{font-size:420px;line-height:.9;font-weight:700;color:var(--primary)}",
+  "notes": "Concept: a scoreboard. This slide: the surprising number."
+}
 ```
 
-`*phrase*` is the highlighter (one per slide), `` `code` `` is inline code. Diff lines start with `- ` or `+ `.
+`<mark>` is the brand highlighter (one per slide), `<code>` is inline code, `pre.editor` is a syntax-highlighted code card. Everything else (layout, scale, grounds, diagrams) is up to the designer. Optional fields: `chrome` (`auto` = handle + counter, `handle`, `counter`, `none`) and `ground` (`paper`, `primary`, `dark`).
 
 ## Brand packs
 

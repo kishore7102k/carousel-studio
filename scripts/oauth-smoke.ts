@@ -286,7 +286,7 @@ async function main() {
       const c = await connect('readonly', 'read');
       const at = c.tok.body?.access_token ?? '';
       const rd = await mcp(at, 'list_carousels', { limit: 1 });
-      const wt = await mcp(at, 'create_carousel', { title: `oauth-smoke ${RUN}`, slides: [{ kind: 'cover', hook: 'Smoke *test*' }, { kind: 'cta', hook: 'Save *this*.' }], render: false });
+      const wt = await mcp(at, 'create_carousel', { title: `oauth-smoke ${RUN}`, slides: [{ kind: 'design', name: 'a', html: '<h1 class="t-hook">Smoke <mark>test</mark></h1>' }, { kind: 'design', name: 'b', html: '<p class="t-title">Save this.</p>' }], render: false });
       check('read-only token: read ok, write tool -> missing scope', rd.ok && !wt.ok && /missing scope/i.test(wt.text + wt.www), `read ${rd.status}; write ${wt.status} ${wt.text.slice(0, 150)}`);
     }
     {

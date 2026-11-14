@@ -31,7 +31,7 @@ export function registerCarouselTools(server: McpServer) {
 
   defineTool(server, 'get_carousel', {
     title: 'Get carousel',
-    description: 'One carousel: slides JSON, image URLs and per-slide lint ({ errors, warnings } for design slides, null for templates) for a version (default current), version history, requests and studio url. Each slide gets a 1-based "n" field in the output only; do not send "n" back.',
+    description: 'One carousel: slides JSON, image URLs and per-slide lint ({ errors, warnings } for design slides, null for legacy template slides) for a version (default current), version history, requests and studio url. Each slide gets a 1-based "n" field in the output only; do not send "n" back.',
     inputSchema: z.object({ id: Id, version: VersionNo.optional() }),
     scope: 'read',
     annotations: { readOnlyHint: true },
@@ -49,7 +49,7 @@ export function registerCarouselTools(server: McpServer) {
 
   defineTool(server, 'create_carousel', {
     title: 'Create carousel',
-    description: 'Creates a carousel as version 1 (status review) and renders it to 1080x1350 PNGs. Follow get_brand_guide first. Slides may be templates, design slides you write in HTML/CSS ({ kind: "design", html, css? }) or saved layouts ({ kind: "design", layout, fill }). Design slides are sanitized and checked: off-canvas content refuses the save; other findings come back as per-slide "warnings". Returns id, version, image URLs, warnings and studio url.',
+    description: 'Creates a carousel as version 1 (status review) and renders it to 1080x1350 PNGs. Follow get_brand_guide first. Every slide is designed by you in HTML/CSS ({ kind: "design", html, css? }) or comes from a saved layout ({ kind: "design", layout, fill }); there are no templates. Pick a visual concept for the carousel first and vary the layouts (see get_brand_guide "Designing slides"). Design slides are sanitized and checked: off-canvas content refuses the save; other findings come back as per-slide "warnings". Returns id, version, image URLs, warnings and studio url.',
     inputSchema: z.object({
       title: z.string().min(1).describe('Internal title, e.g. "Native date input"'),
       tipNumber: z.number().int().positive().optional().describe('Series number shown on the cover label (e.g. "Tip 014"). Use the next number after the highest existing one.'),

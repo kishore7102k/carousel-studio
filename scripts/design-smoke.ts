@@ -134,7 +134,7 @@ async function main() {
     const OVER = { kind: 'design', html: '<h1 class="t-title off">Text pushed below the slide</h1>', css: '.off{margin-top:1500px}' };
     const po = await preview(A, OVER);
     check('preview overflowing slide: reports an error', po.ok && errorsOf(po).length > 0, po.text.slice(0, 300));
-    const saveOver = await call(A, 'create_carousel', { title: `smoke design overflow ${RUN}`, slides: [{ kind: 'cover', hook: 'Smoke *cover*' }, OVER, { kind: 'cta', hook: 'Save *it*' }], render: false });
+    const saveOver = await call(A, 'create_carousel', { title: `smoke design overflow ${RUN}`, slides: [{ kind: 'design', name: 'a', html: '<h1 class="t-hook">Smoke cover</h1>' }, OVER, { kind: 'design', name: 'z', html: '<p class="t-title">end</p>' }], render: false });
     if (saveOver.data?.id) carouselIds.add(saveOver.data.id);
     check('saving an overflowing slide is refused', !saveOver.ok, saveOver.text.slice(0, 200));
 
@@ -188,36 +188,43 @@ async function main() {
     await new Promise(r => setTimeout(r, 800));
     check('hostile preview: catcher received zero requests', hits.length === 0, hits.join(', '));
 
-    // ---- mixed carousel (templates + design), rendered ONCE, includes hostile + asset slides ----
+    // ---- templates are gone: any template kind is rejected with an explanation ----
+    const tplRej = await call(A, 'create_carousel', { title: `smoke design tpl ${RUN}`, slides: [{ kind: 'cover', hook: 'x' }, VALID], render: false });
+    if (tplRej.data?.id) carouselIds.add(tplRej.data.id);
+    check('create_carousel rejects template slides (removed)', !tplRej.ok && /were removed/.test(tplRej.text), tplRej.text.slice(0, 200));
+
+    // ---- all-design carousel, rendered ONCE, includes hostile + asset slides ----
     const mixed = await call(A, 'create_carousel', {
       title: `smoke design mixed ${RUN}`, tipNumber: 1,
       slides: [
-        { kind: 'cover', hook: 'Smoke *mixed* carousel' },
-        { kind: 'content', title: 'Template *slide*', points: ['one', 'two'] },
+        { kind: 'design', name: 'cover', html: '<h1 class="t-hook">Smoke <mark>designed</mark> carousel</h1>' },
         VALID, ASSET, HOSTILE,
-        { kind: 'code', file: 'a.ts', code: 'const a = 1;' },
-        { kind: 'cta', hook: 'Save this for *later*.' },
+        { kind: 'design', name: 'code', html: '<pre class="editor">const a = 1;</pre>' },
       ],
       render: true,
     });
     const mid: string | undefined = mixed.data?.id;
     if (mid) carouselIds.add(mid);
-    check('create mixed carousel (templates + design) with render', mixed.ok && !!mid && (mixed.data?.images?.length ?? mixed.data?.slides ?? 7) !== 0, mixed.text.slice(0, 300));
+    check('create all-design carousel with render', mixed.ok && !!mid && (mixed.data?.images?.length ?? mixed.data?.slides ?? 7) !== 0, mixed.text.slice(0, 300));
     await new Promise(r => setTimeout(r, 800));
     check('hostile saved render: catcher received zero requests (preview + render)', hits.length === 0, hits.join(', '));
     if (mid) {
       const gc = await call(A, 'get_carousel', { id: mid });
       const kinds: string[] = (gc.data?.slides ?? gc.data?.version?.slides ?? []).map((s: any) => s.kind);
-      check('mixed carousel keeps template and design kinds', gc.ok && kinds.includes('cover') && kinds.includes('design') && kinds.includes('code'), kinds.join(',') || gc.text.slice(0, 200));
-      const vs = await call(A, 'view_slides', { id: mid, slides: [3] });
+      check('saved carousel is all design slides', gc.ok && kinds.length === 5 && kinds.every(k => k === 'design'), kinds.join(',') || gc.text.slice(0, 200));
+      const vs = await call(A, 'view_slides', { id: mid, slides: [2] });
       check('view_slides on a design slide returns an image', vs.ok && vs.images === 1, vs.text.slice(0, 200));
     }
 
     // ---- get_slide_source round trip ----
-    const rt = await call(A, 'create_carousel', { title: `smoke design source ${RUN}`, slides: [{ kind: 'cover', hook: 'Smoke *source* cover' }, { kind: 'content', title: 'Source *title*', points: ['a', 'b', 'c'] }, { kind: 'cta', hook: 'Save *it*' }], render: false });
-    const rid: string | undefined = rt.data?.id;
-    if (rid) carouselIds.add(rid);
-    check('create template carousel for round trip', rt.ok && !!rid, rt.text.slice(0, 200));
+    // A LEGACY carousel (template slides) can only exist from before templates were removed: insert one directly.
+    const [legacy] = await getDb().insert(schema.carousels).values({ title: `smoke design source ${RUN}`, status: 'review' }).returning();
+    await getDb().insert(schema.versions).values({ carouselId: legacy.id, number: 1, createdBy: 'smoke', slides: [{ kind: 'cover', hook: 'Smoke *source* cover' }, { kind: 'content', title: 'Source *title*', points: ['a', 'b', 'c'] }, { kind: 'cta', hook: 'Save *it*' }] as never });
+    const rid: string | undefined = legacy.id;
+    carouselIds.add(rid);
+    check('legacy template carousel for round trip', !!rid, 'insert failed');
+    const legacyEdit = await call(A, 'edit_slide', { id: rid, slide: 2, patch: { title: 'still a template' }, render: false });
+    check('edit_slide refuses to keep a legacy template slide', !legacyEdit.ok && /templates were removed/.test(legacyEdit.text), legacyEdit.text.slice(0, 200));
     if (rid) {
       const src = await call(A, 'get_slide_source', { id: rid, slide: 2 });
       const design = [src.data?.design, src.data?.slide, src.data].find(d => d?.kind === 'design') ?? null;
@@ -242,7 +249,7 @@ async function main() {
     const evil = '<img src=x onerror=alert(1)> and *marked*';
     const lc = await call(A, 'create_carousel', {
       title: `smoke design layout ${RUN}`,
-      slides: [{ kind: 'cover', hook: 'Smoke *layout* cover' }, { kind: 'design', layout: lname, fill: { title: 'Plain *title*', body: evil } }, { kind: 'cta', hook: 'Save *it*' }],
+      slides: [{ kind: 'design', name: 'a', html: '<h1 class="t-hook">Smoke layout cover</h1>' }, { kind: 'design', layout: lname, fill: { title: 'Plain *title*', body: evil } }, { kind: 'design', name: 'z', html: '<p class="t-title">end</p>' }],
       render: false,
     });
     const lid: string | undefined = lc.data?.id;

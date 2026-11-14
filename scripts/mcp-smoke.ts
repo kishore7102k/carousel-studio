@@ -66,11 +66,12 @@ async function makeKey(label: string, scopes: string[]) {
   return { name, key, id: row.id };
 }
 
+// Templates were removed: every slide is a design slide.
 const S = {
-  cover: { kind: 'cover', hook: 'Smoke *test* hook' },
-  content: { kind: 'content', title: 'Smoke *title*', points: ['one', 'two'] },
-  code: { kind: 'code', file: 'a.ts', code: 'const a = 1;' },
-  cta: { kind: 'cta', hook: 'Save this for *later*.' },
+  cover: { kind: 'design', name: 'cover', html: '<h1 class="t-hook">Smoke <mark>test</mark> hook</h1>' },
+  content: { kind: 'design', name: 'content', html: '<h2 class="t-title">Smoke <mark>title</mark></h2><ul class="rows"><li>one</li><li>two</li></ul>' },
+  code: { kind: 'design', name: 'code', html: '<pre class="editor">const a = 1;</pre>' },
+  cta: { kind: 'design', name: 'cta', html: '<h1 class="t-hook">Save this for <mark>later</mark>.</h1>' },
 };
 const SLIDES = [S.cover, S.content, S.code, S.cta];
 
@@ -140,22 +141,27 @@ async function main() {
     check('set_carousel_status (deprecated alias)', ss.ok, ss.text);
 
     // ---- slides / versions ----
-    const us = await call(writer.key, 'update_slides', { id: cid, slides: [...SLIDES.slice(0, 3), { kind: 'cta', hook: 'Edited *cta*' }], render: false, note: 'v2' });
+    const us = await call(writer.key, 'update_slides', { id: cid, slides: [...SLIDES.slice(0, 3), { kind: 'design', name: 'cta', html: '<h1 class="t-hook">Edited <mark>cta</mark></h1>' }], render: false, note: 'v2' });
     check('update_slides -> v2', us.ok && us.data?.version === 2, us.text);
     const stale = await call(writer.key, 'update_slides', { id: cid, slides: SLIDES, baseVersion: 1, render: false });
     check('update_slides baseVersion mismatch -> stale', !stale.ok && /stale/.test(stale.text), stale.text);
     const okBase = await call(writer.key, 'update_slides', { id: cid, slides: SLIDES, baseVersion: 2, render: false, note: 'v3' });
     check('update_slides baseVersion match -> v3', okBase.ok && okBase.data?.version === 3, okBase.text);
-    const es = await call(writer.key, 'edit_slide', { id: cid, slide: 2, patch: { title: 'Edited *title*' }, render: false, baseVersion: 3 });
+    const es = await call(writer.key, 'edit_slide', { id: cid, slide: 2, patch: { html: '<h2 class="t-title">Edited <mark>title</mark></h2>' }, render: false, baseVersion: 3 });
     check('edit_slide -> v4', es.ok && es.data?.version === 4, es.text);
-    const esStale = await call(writer.key, 'edit_slide', { id: cid, slide: 2, patch: { title: 'x' }, render: false, baseVersion: 3 });
+    const esStale = await call(writer.key, 'edit_slide', { id: cid, slide: 2, patch: { html: '<p class="t-body">x</p>' }, render: false, baseVersion: 3 });
     check('edit_slide stale', !esStale.ok && /stale/.test(esStale.text), esStale.text);
-    const ins = await call(writer.key, 'insert_slide', { id: cid, at: 5, slide: { kind: 'content', title: 'Inserted *one*', points: ['p'] }, render: false });
+    const ins = await call(writer.key, 'insert_slide', { id: cid, at: 5, slide: { kind: 'design', name: 'inserted', html: '<h2 class="t-title">Inserted <mark>one</mark></h2>' }, render: false });
     check('insert_slide (append) -> v5', ins.ok && ins.data?.version === 5, ins.text);
     const mv = await call(writer.key, 'move_slide', { id: cid, from: 5, to: 2, render: false });
     check('move_slide -> v6', mv.ok && mv.data?.version === 6, mv.text);
     const rm = await call(writer.key, 'remove_slide', { id: cid, slide: 2, render: false });
     check('remove_slide -> v7', rm.ok && rm.data?.version === 7, rm.text);
+    const tpl = await call(writer.key, 'insert_slide', { id: cid, at: 2, slide: { kind: 'content', title: 'Template', points: ['x'] }, render: false });
+    check('template slides are rejected (removed)', !tpl.ok && /were removed/.test(tpl.text), tpl.text.slice(0, 200));
+    const tplC = await call(writer.key, 'create_carousel', { title: 'smoke template rejected', slides: [{ kind: 'cover', hook: 'x' }, { kind: 'cta', hook: 'y' }], render: false });
+    if (tplC.data?.id) carouselIds.add(tplC.data.id);
+    check('create_carousel rejects template slides', !tplC.ok && /were removed/.test(tplC.text), tplC.text.slice(0, 200));
     const cmp = await call(A, 'compare_versions', { id: cid, a: 3, b: 4 });
     check('compare_versions', cmp.ok && JSON.stringify(cmp.data).includes('changed'), cmp.text.slice(0, 300));
     const scv = await call(writer.key, 'set_current_version', { id: cid, version: 4 });

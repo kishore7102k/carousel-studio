@@ -69,24 +69,40 @@ export const Slide = z.discriminatedUnion('kind', [CoverSlide, ContentSlide, Cod
 export type Slide = z.infer<typeof Slide>;
 export const Slides = z.array(Slide).min(2).max(10).describe('5 to 8 slides: a cover first, a cta last, content/code/design in between.');
 
-/** Tool input: any slide, or a design slide made from a saved layout ({ kind: "design", layout, fill }). Resolve with resolveSlideInputs (src/lib/layouts.ts). */
-export const SlideInput = z.union([Slide, LayoutRef]);
-export type SlideInput = z.infer<typeof SlideInput>;
-export const SlideInputs = z.array(SlideInput).min(2).max(10).describe('5 to 8 slides: a cover first, a cta last, content/code/design in between.');
+/** Legacy kinds: still stored in (and rendered for) older carousels, never accepted for new slides. */
+export const TEMPLATE_KINDS = ['cover', 'content', 'code', 'cta'] as const;
+const TEMPLATES_REMOVED = 'Template slides (cover, content, code, cta) were removed. Design every slide yourself: { kind: "design", html, css? } (see get_brand_guide "Designing slides" and get_design_system), or { kind: "design", layout, fill } from a saved layout.';
 
-export const SLIDE_FORMAT_GUIDE = `Slides are JSON objects with a "kind":
-- cover   { kind, label?, hook, sub? }        racing-green cover. First slide.
-- content { kind, title, points?[] | body? }  paper slide with a title and 2-4 points.
-- code    { kind, file?, code, diff?, caption? }  dark editor card. Diff lines start with "- " or "+ ".
-- cta     { kind, hook, sub? }                racing-green closing slide. Last slide.
-- design  { kind, html, css?, chrome?, ground?, name?, notes? }  a slide you design yourself in HTML/CSS on the brand layer
-          (or { kind: "design", layout, fill } from a saved layout). See "Designing slides" / get_design_system; check it with preview_slide.
-Inline marks in text: *phrase* = the brand highlighter (ONE per slide), \`code\` = inline code.
+/**
+ * Tool input: a design slide, or a design slide made from a saved layout ({ kind: "design", layout, fill }).
+ * Resolve with resolveSlideInputs (src/lib/layouts.ts). Template kinds are rejected with an explanation.
+ */
+export const SlideInput = z.union([DesignSlide, LayoutRef], {
+  error: iss => {
+    const kind = (iss.input as { kind?: unknown } | null | undefined)?.kind;
+    return typeof kind === 'string' && (TEMPLATE_KINDS as readonly string[]).includes(kind) ? TEMPLATES_REMOVED : undefined;
+  },
+});
+export type SlideInput = z.infer<typeof SlideInput>;
+export const SlideInputs = z.array(SlideInput).min(2).max(10).describe('5 to 8 slides, each one designed by you ({ kind: "design", html, css? }). No templates.');
+
+export const SLIDE_FORMAT_GUIDE = `Every slide is { kind: "design", html, css?, chrome?, ground?, name?, notes? }: a slide you design yourself in HTML/CSS on the brand layer
+(or { kind: "design", layout, fill } from a layout saved earlier). There are no templates. See "Designing slides" / get_design_system; check each slide with preview_slide.
+Older carousels may still contain legacy template slides (cover, content, code, cta): they keep rendering, but new or replaced slides must be design slides (get_slide_source converts one).
+In html, <mark>phrase</mark> is the brand highlighter (ONE per slide), <code>x</code> is inline code. In layout fill values use *phrase* and \`code\`.
 Limits: 5-8 slides, ~25 words per slide, code lines <= 32 chars. No em dashes, no emoji.`;
 
+/** Blank canvas for a new carousel started in the studio: two design slides to replace with a real design. */
 export const starterSlides = (): Slide[] => [
-  { kind: 'cover', hook: 'Stop doing *this* in your code.', sub: 'There is a simpler way.' },
-  { kind: 'content', title: 'Why it *matters*', points: ['First reason', 'Second reason', 'Third reason'] },
-  { kind: 'code', file: 'example.ts', code: '- oldWay()\n+ newWay()', diff: true, caption: 'Less code, *same result*.' },
-  { kind: 'cta', hook: 'Save this for your *next project*.', sub: 'One dev tip, four days a week.' },
+  {
+    kind: 'design', name: 'start here', ground: 'primary', chrome: 'auto',
+    html: '<h1 class="t-hook">Your <mark>idea</mark> here</h1>',
+    css: '&{justify-content:center}',
+    notes: 'Blank canvas. Ask an agent to design this carousel, or edit the HTML/CSS yourself.',
+  },
+  {
+    kind: 'design', name: 'blank', ground: 'paper', chrome: 'auto',
+    html: '<p class="t-title">Design this slide</p>',
+    css: '&{justify-content:center;align-items:center;text-align:center}',
+  },
 ];

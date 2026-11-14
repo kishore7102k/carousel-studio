@@ -4,7 +4,9 @@
 
 **Problem.** Today every slide is one of four hard-coded layouts (`cover`, `content`, `code`, `cta` in `src/lib/render/html.ts`). An agent can only fill in text, so every carousel looks the same. The brand pack only recolors and refonts those four layouts.
 
-**Goal.** Agents design each slide themselves: layout, hierarchy, diagrams, comparisons, big numbers, checklists, timelines, annotated code, whatever explains the idea best, and upload it over MCP. The brand supplies the **system** (colors, fonts, spacing, radii, signature moves like the marker and keycap, the handle footer), not the layout. The studio renders, checks and versions it exactly like today. The four templates stay as presets.
+**Goal.** Agents design each slide themselves: layout, hierarchy, diagrams, comparisons, big numbers, checklists, timelines, annotated code, whatever explains the idea best, and upload it over MCP. The brand supplies the **system** (colors, fonts, spacing, radii, signature moves like the marker and keycap, the handle footer), not the layout. The studio renders, checks and versions it exactly like today. ~~The four templates stay as presets.~~
+
+> **Changed 2026-11-15 (maintainer):** templates are **removed**, not kept as presets. New slides must be `design` slides: MCP tools reject `cover` / `content` / `code` / `cta` with an explanation, `edit_slide` cannot keep a legacy template slide, the studio's New carousel / Add slide start from a blank design canvas, and the brand guide no longer includes the brand README's "Template:" sections or copyable example slides (it teaches concept-first design and variety instead). The template renderers stay only so older carousels keep rendering (render-check still verifies them).
 
 The loop an agent runs: read the brand system → design a slide → **preview** it (PNG + automatic checks) → fix → save as a version → the human reviews and pins notes → the agent revises.
 

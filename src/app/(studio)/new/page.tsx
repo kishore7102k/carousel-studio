@@ -7,7 +7,7 @@ export default function NewCarousel() {
       <div className="forms">
         <form action={requestNewCarousel} className="form-card">
           <h2>Ask an agent</h2>
-          <p className="muted">Describe the tip. Any connected agent picks it up from the queue, writes the slides and renders them.</p>
+          <p className="muted">Describe the tip. Any connected agent picks it up from the queue, designs every slide (its own concept and layouts on your brand) and renders them.</p>
           <div>
             <label htmlFor="prompt">Prompt</label>
             <textarea id="prompt" name="prompt" rows={7} required placeholder="Tip about the native <dialog> element replacing modal libraries. Show before/after code. 6 slides." />
@@ -16,7 +16,7 @@ export default function NewCarousel() {
         </form>
         <form action={createBlank} className="form-card">
           <h2>Write it myself</h2>
-          <p className="muted">Starts from the 4-slide template. Edit the text on the next screen; it renders on save.</p>
+          <p className="muted">Starts from a blank 2-slide design canvas. Edit the HTML/CSS on the next screen (Preview shows the result); it renders on save.</p>
           <div>
             <label htmlFor="title">Title</label>
             <input id="title" name="title" required placeholder="Native date input" />
@@ -25,7 +25,7 @@ export default function NewCarousel() {
             <label htmlFor="tipNumber">Number (shown on the cover label)</label>
             <input id="tipNumber" name="tipNumber" type="number" min={1} placeholder="14" />
           </div>
-          <button type="submit" className="btn">Create from template</button>
+          <button type="submit" className="btn">Create blank canvas</button>
         </form>
       </div>
     </>

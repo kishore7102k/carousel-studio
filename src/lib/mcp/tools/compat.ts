@@ -35,16 +35,16 @@ export function registerCompatTools(server: McpServer) {
 
   server.registerPrompt('make_carousel', {
     title: 'Make a carousel',
-    description: 'Write and save a 5-8 slide carousel on a topic, following the brand guide.',
+    description: 'Design and save a 5-8 slide carousel on a topic: your own visual concept and layouts on the brand system (no templates).',
     argsSchema: z.object({ topic: z.string() }),
   }, async ({ topic }) => user(
-    `Make a carousel about: ${topic}\n\n1. Read the brand guide first (get_brand_guide or the studio://brand-guide resource) and follow its voice and limits.\n2. Draft 5 to 8 slides: a cover with a hook (one *marked* phrase), content/code slides with one idea each, and a closing cta slide.\n3. Save it with create_carousel, then check the rendered result with view_slides and fix anything that overflows with edit_slide.\n4. Reply with the carousel link. Leave the status for the human.`,
+    `Design a carousel about: ${topic}\n\n1. Read the brand guide first (get_brand_guide or the studio://brand-guide resource), especially "Designing slides": the brand gives you colors, fonts and voice, not layouts. get_design_system lists the CSS variables and classes.\n2. Think before designing: the one takeaway, the story arc across 5 to 8 slides, and a visual concept for this carousel (write it in the first slide's notes). Choose each slide's layout from its content and vary layouts between slides; do not fall back on a "label + hook, title + bullet list, code card, closing line" formula.\n3. Build every slide as { kind: "design", html, css }. preview_slide each one, look at the image critically (hierarchy, balance, empty space, contrast), fix warnings and weak spots, and preview again.\n4. Save with create_carousel, check it with view_slides, fix anything off with edit_slide.\n5. Reply with the carousel link and one line on the concept. Leave the status for the human.`,
   ));
 
   server.registerPrompt('handle_requests', {
     title: 'Handle requests',
     description: 'Work through the open requests in the queue: claim, fix, complete.',
   }, async () => user(
-    `Work through the open requests in Carousel Studio.\n\n1. Read the brand guide (get_brand_guide) once.\n2. list_requests to see what is open. For each request: claim_request, then read the carousel with get_carousel (slide numbers are 1-based).\n3. Make the change with edit_slide / insert_slide / remove_slide / move_slide (pass baseVersion), or create_carousel for "new" requests. Check the result with view_slides.\n4. complete_request with a one-line reply and the resulting version, or dismiss_request if it should not be done.\n5. Stop when list_requests is empty and summarise what you changed.`,
+    `Work through the open requests in Carousel Studio.\n\n1. Read the brand guide (get_brand_guide) once.\n2. list_requests to see what is open. For each request: claim_request, then read the carousel with get_carousel (slide numbers are 1-based).\n3. Make the change with edit_slide / insert_slide / remove_slide / move_slide (pass baseVersion), designing slides yourself (no templates; preview_slide before saving), or design a whole carousel with create_carousel for "new" requests. Check the result with view_slides.\n4. complete_request with a one-line reply and the resulting version, or dismiss_request if it should not be done.\n5. Stop when list_requests is empty and summarise what you changed.`,
   ));
 }

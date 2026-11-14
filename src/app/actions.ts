@@ -67,7 +67,7 @@ export async function requestNewCarousel(formData: FormData) {
 export async function createBlank(formData: FormData) {
   const title = String(formData.get('title') || '').trim() || 'Untitled carousel';
   const tip = Number(formData.get('tipNumber')) || null;
-  const res = await store.createCarousel({ title, tipNumber: tip, slides: starterSlides(), createdBy: HUMAN, note: 'Starter template' });
+  const res = await store.createCarousel({ title, tipNumber: tip, slides: starterSlides(), createdBy: HUMAN, note: 'Blank design canvas' });
   await log('create_carousel', res.id, { title });
   redirect(`/c/${res.id}`);
 }

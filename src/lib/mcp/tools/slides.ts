@@ -32,7 +32,7 @@ const COMMON = 'Creates a NEW version from the CURRENT version (old versions are
 export function registerSlideTools(server: McpServer) {
   defineTool(server, 'update_slides', {
     title: 'Update slides',
-    description: 'Replaces ALL slides: saves the full array as a NEW version from the current one (old versions are kept) and renders it. Send every slide, not a diff; for one-slide changes prefer edit_slide / insert_slide / remove_slide / move_slide. Slides may be templates, design slides or { kind: "design", layout, fill }. Design slides are sanitized and checked: off-canvas content refuses the save, other findings come back as per-slide "warnings". Pass baseVersion to fail with "stale" if someone else changed the carousel since you read it.',
+    description: 'Replaces ALL slides: saves the full array as a NEW version from the current one (old versions are kept) and renders it. Send every slide, not a diff; for one-slide changes prefer edit_slide / insert_slide / remove_slide / move_slide. Every slide must be a design slide ({ kind: "design", html, css? }) or { kind: "design", layout, fill }; template kinds are rejected (legacy template slides in older carousels must be replaced by designed ones: get_slide_source converts them). Design slides are sanitized and checked: off-canvas content refuses the save, other findings come back as per-slide "warnings". Pass baseVersion to fail with "stale" if someone else changed the carousel since you read it.',
     inputSchema: z.object({ id: Id, slides: SlideInputs, ...editOpts }),
     scope: 'write',
     carouselArg: 'id',
@@ -44,17 +44,23 @@ export function registerSlideTools(server: McpServer) {
 
   defineTool(server, 'edit_slide', {
     title: 'Edit one slide',
-    description: `Changes fields of ONE slide by shallow-merging \`patch\` into slide n: given fields replace the old values, omitted fields stay, and a field set to null is removed (e.g. { "sub": null }). Arrays like "points" are replaced whole. Changing "kind" is allowed only if the result is a valid slide of the new kind (send its required fields too); fields the new kind does not have are dropped and listed in "dropped". ${COMMON} Returns the edited slide.`,
+    description: `Changes fields of ONE slide by shallow-merging \`patch\` into slide n: given fields replace the old values, omitted fields stay, and a field set to null is removed (e.g. { "sub": null }). Arrays like "points" are replaced whole. The result must be a design slide: on a legacy template slide (cover/content/code/cta in an older carousel) send a full design instead, e.g. { "kind": "design", "html": "…", "css": "…" } (get_slide_source gives you its design source to start from). Fields a design slide does not have are dropped and listed in "dropped". ${COMMON} Returns the edited slide.`,
     inputSchema: z.object({
       id: Id,
       slide: SlideNo.describe('1-based slide number'),
-      patch: z.record(z.string(), z.unknown()).describe('Fields to set, e.g. { "title": "New *title*" } or { "points": ["a", "b"] }; null removes a field. See get_brand_guide for the fields of each kind.'),
+      patch: z.record(z.string(), z.unknown()).describe('Fields to set on the design slide, e.g. { "html": "…" } or { "css": "…", "ground": "dark" }; null removes a field.'),
       ...editOpts,
     }),
     scope: 'write',
     carouselArg: 'id',
   }, async (args, ctx) => {
     if (!Object.keys(args.patch).length) return fail('empty patch: send at least one field');
+    // Templates were removed: an edit must leave a design slide (legacy template slides are replaced by a full design).
+    const cur = (await store.getCarousel(args.id))?.version?.slides[args.slide - 1];
+    const nextKind = typeof args.patch.kind === 'string' ? args.patch.kind : cur?.kind;
+    if (cur && nextKind !== 'design') {
+      return fail(`slide ${args.slide} is a legacy "${cur.kind}" template and templates were removed: send a full design, e.g. patch { "kind": "design", "html": "…", "css": "…" } (get_slide_source gives its design source to start from)`);
+    }
     const r = await store.editSlide({ ...args, createdBy: agentOf(ctx) });
     return json(
       out(args.id, r, { slide: { n: args.slide, ...r.slides[args.slide - 1] }, ...(r.dropped.length ? { dropped: r.dropped } : {}) }),
@@ -64,7 +70,7 @@ export function registerSlideTools(server: McpServer) {
 
   defineTool(server, 'insert_slide', {
     title: 'Insert slide',
-    description: `Inserts one new slide BEFORE position \`at\` (1-based); at = slide count + 1 appends at the end. Max 10 slides. The slide may be a template, a design slide or { kind: "design", layout, fill }. ${COMMON}`,
+    description: `Inserts one new slide BEFORE position \`at\` (1-based); at = slide count + 1 appends at the end. Max 10 slides. The slide is a design slide ({ kind: "design", html, css? }) or { kind: "design", layout, fill }; template kinds are rejected. Give it a different layout from its neighbours. ${COMMON}`,
     inputSchema: z.object({
       id: Id,
       at: SlideNo.describe('1-based position the new slide will have; count+1 appends'),
