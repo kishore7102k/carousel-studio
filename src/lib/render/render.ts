@@ -30,7 +30,10 @@ async function launch(host: string | null): Promise<Browser> {
   const lockArgs = [`--host-resolver-rules=MAP * ~NOTFOUND${host ? `, EXCLUDE ${host}` : ''}`, '--dns-prefetch-disable', '--disable-background-networking'];
   if (process.env.VERCEL) {
     const sparticuz = (await import('@sparticuz/chromium')).default;
-    return chromium.launch({ executablePath: await sparticuz.executablePath(), args: [...sparticuz.args, ...lockArgs], headless: true });
+    // --single-process is meant for AWS Lambda. With Playwright contexts + request interception it makes the browser
+    // die mid-render ("Target page, context or browser has been closed"); Vercel functions can run child processes.
+    const args = sparticuz.args.filter(a => a !== '--single-process');
+    return chromium.launch({ executablePath: await sparticuz.executablePath(), args: [...args, ...lockArgs], headless: true });
   }
   // Local dev: use an installed browser (Edge ships with Windows) or CHROME_PATH.
   return process.env.CHROME_PATH
@@ -38,8 +41,21 @@ async function launch(host: string | null): Promise<Browser> {
     : chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : 'chrome', args: lockArgs, headless: true });
 }
 
+/** Browser-level failures (crash, closed target, compositor hiccup) are retried once with a fresh browser. */
+const BROWSER_FLAKE = /has been closed|Target closed|browser has disconnected|crash|Unable to capture screenshot|Protocol error/i;
+
 /** Renders full HTML pages to 1080x1350 PNGs in one locked-down browser. Pages with lint: true are also checked. */
 export async function renderPages(pages: { html: string; lint: boolean }[], brand: BrandPack): Promise<Rendered[]> {
+  try {
+    return await renderPagesOnce(pages, brand);
+  } catch (err) {
+    if (!BROWSER_FLAKE.test(String(err))) throw err;
+    console.error('render: browser failure, retrying once with a fresh browser:', String(err).slice(0, 300));
+    return renderPagesOnce(pages, brand);
+  }
+}
+
+async function renderPagesOnce(pages: { html: string; lint: boolean }[], brand: BrandPack): Promise<Rendered[]> {
   const host = assetHost();
   const browser = await launch(host);
   try {
@@ -82,7 +98,8 @@ export async function renderPages(pages: { html: string; lint: boolean }[], bran
     }
     return out;
   } finally {
-    await browser.close();
+    // A crashed browser can reject close(); that must not mask the real error (or block the retry).
+    await browser.close().catch(() => {});
   }
 }
 
