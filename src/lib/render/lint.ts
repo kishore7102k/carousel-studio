@@ -137,7 +137,7 @@ function inPage(o: LintOptions): Lint {
     for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
       if (parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') check(cs[`border${side}Color`], el, 'border');
     }
-    if (el instanceof SVGElement) { check(cs.fill, el, 'fill'); if (cs.stroke !== 'none') check(cs.stroke, el, 'stroke'); }
+    if (el instanceof SVGElement && /^(path|rect|circle|ellipse|line|polyline|polygon|text|tspan)$/.test(el.tagName)) { if (cs.fill !== 'none') check(cs.fill, el, 'fill'); if (cs.stroke !== 'none') check(cs.stroke, el, 'stroke'); }
   }
   for (const [c, where] of [...offBrand].slice(0, 5)) warnings.push(`color ${c} is not in the brand palette (${where}); use the CSS variables`);
   if (offBrand.size > 5) warnings.push(`${offBrand.size - 5} more off-palette colors`);
