@@ -130,7 +130,8 @@ async function main() {
     check('preview valid design: no errors', pv.ok && pv.data !== null && errorsOf(pv).length === 0, pv.text.slice(0, 300));
 
     // ---- 2. overflow ----
-    const OVER = { kind: 'design', html: '<div class="tall">too tall</div>', css: '.tall{width:1080px;height:3200px;background:var(--primary);color:var(--paper);font-size:48px}' };
+    // lint errors on CONTENT (text/media) off the canvas; an oversized background box is just clipped (allowed)
+    const OVER = { kind: 'design', html: '<h1 class="t-title off">Text pushed below the slide</h1>', css: '.off{margin-top:1500px}' };
     const po = await preview(A, OVER);
     check('preview overflowing slide: reports an error', po.ok && errorsOf(po).length > 0, po.text.slice(0, 300));
     const saveOver = await call(A, 'create_carousel', { title: `smoke design overflow ${RUN}`, slides: [{ kind: 'cover', hook: 'Smoke *cover*' }, OVER, { kind: 'cta', hook: 'Save *it*' }], render: false });
@@ -219,7 +220,7 @@ async function main() {
     check('create template carousel for round trip', rt.ok && !!rid, rt.text.slice(0, 200));
     if (rid) {
       const src = await call(A, 'get_slide_source', { id: rid, slide: 2 });
-      const design = src.data?.slide?.kind === 'design' ? src.data.slide : src.data?.kind === 'design' ? src.data : null;
+      const design = [src.data?.design, src.data?.slide, src.data].find(d => d?.kind === 'design') ?? null;
       check('get_slide_source: template slide comes back as design source', src.ok && !!design && typeof design.html === 'string' && design.html.length > 0, src.text.slice(0, 300));
       if (design) {
         const pr = await preview(A, design, { carouselId: rid, n: 2, total: 3 });

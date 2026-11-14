@@ -60,9 +60,6 @@ export function tokenColor(b: BrandPack, name: string, depth = 0): string | unde
   return alias ? tokenColor(b, alias[1], depth + 1) : v;
 }
 
-const tokenUsage = (b: BrandPack, role: Role) =>
-  b.tokens.color.tokens.find(c => c.name === (b.roles[role] ?? role))?.usage;
-
 /** Every color the brand allows (first theme): all color tokens + all roles. Lint compares computed colors with this. */
 export function brandPalette(b: BrandPack): string[] {
   const all = [

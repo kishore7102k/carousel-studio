@@ -134,6 +134,11 @@ Slide numbers in every tool input and output are **1-based**. Every slide change
 | `list_activity` | read | Who did what, newest first. |
 | `list_connections`, `create_key`, `revoke_access` | admin | Manage API keys (a key can't revoke itself). |
 | `search`, `fetch` | read | OpenAI-compatible search over carousels and requests (ids `carousel:<uuid>`, `request:<uuid>`). |
+| `get_design_system` | read | The brand layer as data: CSS variables, classes with examples, type scale, spacing, radii, lint rules. |
+| `preview_slide` | read | Render one slide without saving: the PNG plus `errors` / `warnings` from the design checks. |
+| `get_slide_source` | read | Any slide as an editable `design` slide (templates converted), to remix. |
+| `upload_asset`, `list_assets`, `delete_asset` | write / read / write | Images and SVGs (PNG, JPEG, WebP, SVG; max 2 MB; SVG sanitized) to use in design slides. |
+| `save_layout`, `list_layouts`, `get_layout`, `delete_layout` | write / read / read / write | Reusable design layouts with `{{placeholders}}`. |
 
 Also exposed: the resource `studio://brand-guide` and the prompts `make_carousel` (topic → new carousel) and `handle_requests` (claim → fix → complete loop).
 
@@ -146,6 +151,16 @@ Deleting a carousel (UI or `delete_carousel`) moves it to the **Trash** (gallery
 With the dev server running (`npm run dev`), `npm run mcp:smoke` creates temporary keys, calls every tool against `STUDIO_URL` (default `http://localhost:3000`), checks scopes, stale versions, claim races, trash/purge and brand output, then deletes everything it created. It briefly changes the brand and restores it afterwards, so don't render carousels while it runs.
 
 `npm run oauth:smoke` tests the OAuth side against the dev server: discovery documents, registration, the real login and consent pages (driven in a local Chrome/Edge via Playwright), the PKCE token exchange, an MCP call with the token, and the failure cases (wrong verifier, reused code, wrong redirect URI or resource, `plain` PKCE, expired token, refresh-token reuse, read-only scope, disconnected app, SSRF-guarded metadata URLs). It removes every client and token it created.
+
+`npm run design:smoke` tests designed slides: previews (valid, off-canvas text, off-brand color and font), a hostile slide (scripts, frames, remote images, CSS `@import` and `url()`) that must make **zero** requests to a local catcher both in preview and in a saved render, mixed carousels, `get_slide_source`, assets, layouts (fill values escaped), and that the templates are unchanged (`npx tsx scripts/render-check.ts --check`).
+
+## Designed slides
+
+Besides the four templates, agents can design a slide themselves: `{ "kind": "design", "html": "…", "css": "…" }` on a 1080×1350 canvas. The studio adds the **brand layer**: your fonts, every brand color as a CSS variable (`--primary`, `--paper`, `--ink`, `--marker`…), type scale, spacing and radius variables, utility classes (`mark`, `.key`, `.chip`, `.card`, `pre.editor` with highlighting…) and the chrome (handle + `n / total`, option `chrome`). `ground` picks paper, primary or dark. The brand guide (`get_brand_guide`) teaches agents all of it with examples.
+
+The loop: `get_design_system` → write HTML/CSS → `preview_slide` → fix what the checks report → save with `create_carousel` / `update_slides` / `edit_slide`. Checks: text or images off the canvas block the save; outside the 64 px safe area, clipped text, overlap with the footer, text under 24 px, non-brand fonts, off-palette colors, more than one marker and low contrast are warnings, shown as a badge on the slide in the studio. Good designs can be saved as **layouts** (`{{placeholders}}`) and reused with `{ "kind": "design", "layout": "big-number", "fill": { … } }`.
+
+Agent HTML runs in the server's browser, so rendering is locked down: page JavaScript off, every network request blocked except `data:` and your own Blob store, a CSP, and the HTML/CSS is sanitized (no scripts, frames, forms, event handlers, remote URLs or `@import`). Agent CSS is scoped to the slide and can't move the slide box or cover the chrome.
 
 ## Slide format
 

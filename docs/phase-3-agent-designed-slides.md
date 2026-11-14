@@ -83,8 +83,8 @@ After finishing each item, tick it here and commit code + this file together. If
 - [x] 7. Assets: table, `upload_asset` / `list_assets` / `delete_asset` (assets are global, not per carousel, so purge does not remove them)
 - [x] 8. Layouts: table + tools + `{ layout, fill }` in slide inputs (resolveSlideInputs ready; Agent A wires it into create/update/insert)
 - [x] 9. UI: design slide editor + preview + warnings, Convert to design, Layouts page
-- [ ] 10. `scripts/design-smoke.ts` + `npm run design:smoke` passing; other smoke tests still passing
-- [ ] 11. README + brand guide docs; build + lint clean
+- [x] 10. `scripts/design-smoke.ts` + `npm run design:smoke` passing; other smoke tests still passing
+- [x] 11. README + brand guide docs; build + lint clean
 - [ ] 12. Manual: ask Claude.ai and ChatGPT (via the connector) to design a 6-slide carousel on a topic with no template slides; record results here
 
 ## 9. Definition of done
