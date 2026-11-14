@@ -1,10 +1,10 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { verifyApiKey } from '@/lib/auth';
-import { registerAllTools } from '@/lib/mcp/tools';
+import { registerStudio } from '@/lib/mcp/server';
 
 export const maxDuration = 300;
 
-const handler = createMcpHandler(registerAllTools, {
+const handler = createMcpHandler(registerStudio, {
   serverInfo: { name: 'carousel-studio', version: '0.1.0' },
 });
 

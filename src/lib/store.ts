@@ -154,3 +154,10 @@ export async function listActivity(filter: { carouselId?: string; limit?: number
     .where(filter.carouselId ? eq(activity.carouselId, filter.carouselId) : undefined)
     .orderBy(desc(activity.createdAt)).limit(Math.min(filter.limit ?? 50, 200));
 }
+
+type RequestRow = typeof requests.$inferSelect;
+/** Request as agents see it: 0-based slideIndex becomes 1-based `slide`. */
+export function requestOut(r: RequestRow) {
+  const { slideIndex, ...rest } = r;
+  return { ...rest, slide: slideIndex == null ? null : slideIndex + 1 };
+}
