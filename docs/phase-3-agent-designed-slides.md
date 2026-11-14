@@ -86,6 +86,7 @@ After finishing each item, tick it here and commit code + this file together. If
 - [x] 10. `scripts/design-smoke.ts` + `npm run design:smoke` passing; other smoke tests still passing
 - [x] 11. README + brand guide docs; build + lint clean
 - [ ] 12. Manual: ask Claude.ai and ChatGPT (via the connector) to design a 6-slide carousel on a topic with no template slides; record results here
+  - 2026-11-15, live MCP (API key, deployed app): designed a 6-slide carousel with no templates (cover, timeline, big number, code card, comparison, CTA), iterated with preview_slide (2 design rounds), saved + rendered: all slides 0 errors / 0 warnings, on-brand. Carousel "Demo (live MCP test): cancel stale fetches". Live suites: design:smoke 34/34, mcp:smoke 77/77. Fixed on the way: Vercel render crashes (--single-process). Still to do: same via Claude.ai and ChatGPT connectors.
 
 ## 9. Definition of done
 
