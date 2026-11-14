@@ -73,7 +73,12 @@ export async function validSession(value: string | undefined) {
   if (!value || !process.env.STUDIO_SESSION_SECRET) return false;
   const [exp, sig] = value.split('.');
   if (!exp || !sig || +exp < Date.now()) return false;
-  return sig === (await hmac(exp));
+  const expected = await hmac(exp);
+  // constant-time compare (both are hex strings of equal length when valid)
+  if (sig.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < sig.length; i++) diff |= sig.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
 }
 
 export const sessionMaxAge = SESSION_DAYS * 86_400;
