@@ -6,7 +6,7 @@ import { getBrand, resetBrand, saveBrand, ROLES, type BrandPack } from '@/lib/br
 const WEIGHTS: Record<string, string> = { thin: '100', extralight: '200', light: '300', regular: '400', book: '400', medium: '500', semibold: '600', bold: '700', extrabold: '800', black: '900' };
 
 export async function updateBrandDetails(_prev: unknown, formData: FormData) {
-  const cur = await getBrand();
+  const cur = await getBrand({ fresh: true });
   let roles = cur.roles;
   const rolesText = String(formData.get('roles') || '').trim();
   if (rolesText) {
@@ -50,7 +50,7 @@ export async function importBrandPack(_prev: unknown, formData: FormData) {
     });
   }
   const readmeFile = formData.get('readme') as File | null;
-  const cur = await getBrand();
+  const cur = await getBrand({ fresh: true });
   await saveBrand({
     ...cur,
     name: (tokens as { name?: string }).name ?? cur.name,
