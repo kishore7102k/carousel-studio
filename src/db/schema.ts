@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, real, jsonb, timestamp, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import type { Slide } from '@/lib/slides';
 
@@ -7,6 +8,7 @@ export const carousels = pgTable('carousels', {
   tipNumber: integer('tip_number'),
   status: text('status', { enum: ['draft', 'review', 'approved', 'posted'] }).notNull().default('draft'),
   currentVersion: integer('current_version').notNull().default(1),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -52,6 +54,16 @@ export const apiKeys = pgTable('api_keys', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   hash: text('hash').notNull().unique(),
+  scopes: text('scopes').array().notNull().default(sql`'{read,write}'`),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 });
+
+export const activity = pgTable('activity', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  actor: text('actor').notNull(),
+  action: text('action').notNull(),
+  carouselId: uuid('carousel_id').references(() => carousels.id, { onDelete: 'set null' }),
+  detail: jsonb('detail').$type<Record<string, unknown> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('activity_carousel_created').on(t.carouselId, t.createdAt)]);
