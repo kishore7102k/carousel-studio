@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { getBrand } from '@/lib/brand';
 import { Slides, SLIDE_FORMAT_GUIDE } from '@/lib/slides';
 import * as store from '@/lib/store';
-import { defineTool, studioUrl, json, fail, agentOf } from '@/lib/mcp/server';
+import { defineTool, carouselUrl, json, fail, agentOf } from '@/lib/mcp/server';
 
 const WORKFLOW = `Carousel Studio workflow for agents:
 1. Call get_brand_guide once per session and follow it (voice, one marked phrase per slide, limits). Scopes on your key: read, write, or admin. Slide numbers in tool inputs/outputs are 1-based.
@@ -50,7 +50,7 @@ export function registerAllTools(server: McpServer) {
     annotations: { readOnlyHint: true },
   }, async ({ status, query, includeTrashed, limit }) => {
     const rows = await store.listCarousels({ status, query, includeTrashed: includeTrashed ?? false, limit: limit ?? 50 });
-    return json(rows.map(c => ({ id: c.id, title: c.title, tipNumber: c.tipNumber, status: c.status, currentVersion: c.currentVersion, cover: c.cover, openRequests: c.openRequests, updatedAt: c.updatedAt, deletedAt: c.deletedAt ?? null, url: studioUrl(`/carousel/${c.id}`) })));
+    return json(rows.map(c => ({ id: c.id, title: c.title, tipNumber: c.tipNumber, status: c.status, currentVersion: c.currentVersion, cover: c.cover, openRequests: c.openRequests, updatedAt: c.updatedAt, deletedAt: c.deletedAt ?? null, url: carouselUrl(c.id) })));
   });
 
   // ── get_carousel ─────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ export function registerAllTools(server: McpServer) {
     if (!got) return fail(`carousel ${id} not found`);
     // Add 1-based n to slides in output
     const slides = got.version?.slides.map((s, i) => ({ n: i + 1, ...s })) ?? [];
-    const url = studioUrl(`/carousel/${id}`);
+    const url = carouselUrl(id);
     return json({ ...got, version: got.version ? { ...got.version, slides } : null, url });
   });
 
@@ -83,7 +83,7 @@ export function registerAllTools(server: McpServer) {
     scope: 'write',
   }, async (args, ctx) => {
     const result = await store.createCarousel({ ...args, createdBy: agentOf(ctx) });
-    return json({ ...result, url: studioUrl(`/carousel/${result.id}`) });
+    return json({ ...result, url: carouselUrl(result.id) });
   });
 
   // ── update_slides ────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export function registerAllTools(server: McpServer) {
     scope: 'write',
   }, async (args, ctx) => {
     const result = await store.updateSlides({ ...args, createdBy: agentOf(ctx) });
-    return json({ ...result, url: studioUrl(`/carousel/${args.id}`) });
+    return json({ ...result, url: carouselUrl(args.id) });
   });
 
   // ── render_carousel ──────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ export function registerAllTools(server: McpServer) {
     annotations: { idempotentHint: true },
   }, async ({ id, version }) => {
     const result = await store.renderCarousel(id, version);
-    return json({ ...result, url: studioUrl(`/carousel/${id}`) });
+    return json({ ...result, url: carouselUrl(id) });
   });
 
   // ── view_slides ──────────────────────────────────────────────────────────────

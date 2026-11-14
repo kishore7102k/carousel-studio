@@ -1,67 +1,61 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { z } from 'zod';
-import { getDb, schema } from '@/db';
+import { logActivity } from '@/lib/store';
 
-// ---------- URL helper ----------
+// ---------- URL helpers ----------
 
+/** Public studio URL: STUDIO_URL, else the Vercel production domain, else localhost. */
 export function studioUrl(path = '') {
   const base =
-    process.env.STUDIO_URL ??
+    process.env.STUDIO_URL?.replace(/\/+$/, '') ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : 'http://localhost:3000');
   return `${base}${path}`;
 }
 
-// ---------- Activity log ----------
+export const carouselUrl = (id: string) => studioUrl(`/c/${id}`);
 
-export async function logActivity(
-  actor: string,
-  action: string,
-  carouselId?: string | null,
-  detail?: Record<string, unknown> | null,
-) {
-  try {
-    await getDb()
-      .insert(schema.activity)
-      .values({ actor, action, carouselId: carouselId ?? null, detail: detail ?? null });
-  } catch {
-    // best-effort: logging failures must never surface to the caller
-  }
-}
+// ---------- Scopes ----------
 
-// ---------- Scope helpers ----------
-
-type Scope = 'read' | 'write' | 'admin';
+export type Scope = 'read' | 'write' | 'admin';
 
 /** admin ⊇ write ⊇ read */
-function hasScope(callerScopes: string[], required: Scope): boolean {
-  if (required === 'read') return callerScopes.some(s => ['read', 'write', 'admin'].includes(s));
-  if (required === 'write') return callerScopes.some(s => ['write', 'admin'].includes(s));
-  return callerScopes.includes('admin');
+const RANK: Record<string, number> = { read: 1, write: 2, admin: 3 };
+export function hasScope(callerScopes: string[], required: Scope): boolean {
+  return callerScopes.some(s => (RANK[s] ?? 0) >= RANK[required]);
 }
 
-// ---------- Tool context types ----------
+// ---------- Tool context ----------
 
-export type McpCtx = { http?: { authInfo?: { clientId?: string; scopes?: string[] } } };
-
-export function agentOf(ctx: McpCtx): string {
-  return ctx.http?.authInfo?.clientId ?? 'agent';
-}
-
-function scopesOf(ctx: McpCtx): string[] {
-  return ctx.http?.authInfo?.scopes ?? ['read', 'write'];
-}
-
-// ---------- Result helpers (re-exported for tools) ----------
-
-export type ToolResult = {
-  content: Array<{ type: string; text?: string; mimeType?: string; data?: string }>;
-  isError?: boolean;
+export type McpCtx = {
+  http?: { authInfo?: { clientId?: string; scopes?: string[]; extra?: Record<string, unknown> } };
 };
 
-export const json = (data: unknown): ToolResult => ({
+export const agentOf = (ctx: McpCtx): string => ctx.http?.authInfo?.clientId ?? 'agent';
+export const keyIdOf = (ctx: McpCtx): string | null => {
+  const id = ctx.http?.authInfo?.extra?.keyId;
+  return typeof id === 'string' ? id : null;
+};
+// Auth is required on /api/mcp, so a missing authInfo only happens in tests; treat it as no scopes.
+const scopesOf = (ctx: McpCtx): string[] => ctx.http?.authInfo?.scopes ?? [];
+
+// ---------- Results ----------
+
+type Content =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
+export type ToolResult = {
+  content: Content[];
+  isError?: boolean;
+  /** Not sent to the client. Overrides what defineTool writes to the activity log. */
+  activity?: { carouselId?: string | null; detail?: Record<string, unknown> };
+};
+
+export const json = (data: unknown, activity?: ToolResult['activity']): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+  ...(activity ? { activity } : {}),
 });
 
 export const fail = (message: string): ToolResult => ({
@@ -71,84 +65,76 @@ export const fail = (message: string): ToolResult => ({
 
 // ---------- defineTool ----------
 
-type AnnotationSet = {
+type Annotations = {
   readOnlyHint?: boolean;
   destructiveHint?: boolean;
   idempotentHint?: boolean;
-  openWorldHint?: boolean;
+  openWorldHint?: false;
 };
 
-type ToolDef<S extends z.ZodTypeAny> = {
+type ToolDef<S extends z.ZodType> = {
   title: string;
   description: string;
   inputSchema: S;
   scope: Scope;
-  annotations?: AnnotationSet;
+  annotations?: Annotations;
+  /** Which input field holds the carousel id, for the activity log. Handlers can override via result.activity. */
+  carouselArg?: 'id' | 'carouselId';
 };
 
+/** Keys never copied into activity detail (large or binary). */
+const SKIP_DETAIL = new Set(['slides', 'slide', 'fonts', 'tokens', 'readme', 'base64']);
+
+function compactDetail(args: Record<string, unknown>) {
+  const detail: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (SKIP_DETAIL.has(k) || v === undefined) continue;
+    const s = JSON.stringify(v);
+    detail[k] = s && s.length > 300 ? '[omitted]' : v;
+  }
+  return detail;
+}
+
 /**
- * Registers a tool on the MCP server with:
- * - Scope enforcement (returns `isError` with "missing scope: X" when insufficient)
- * - Error catching (returns `isError` with the error message, never a stack trace)
- * - Activity logging for every `write` / `admin` tool call (best-effort)
+ * Registers a tool with:
+ * - scope enforcement (`missing scope: X` error result),
+ * - error catching (readable message, never a stack trace),
+ * - an activity row for every successful write/admin call (actor = agent name).
  */
-export function defineTool<S extends z.ZodTypeAny>(
+export function defineTool<S extends z.ZodType>(
   server: McpServer,
   name: string,
   def: ToolDef<S>,
   handler: (args: z.infer<S>, ctx: McpCtx) => Promise<ToolResult>,
 ) {
-  const { title, description, inputSchema, scope, annotations = {} } = def;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (server.registerTool as any)(
+  const { title, description, inputSchema, scope, annotations = {}, carouselArg } = def;
+  server.registerTool(
     name,
-    {
-      title,
-      description,
-      inputSchema,
-      annotations: { openWorldHint: false, ...annotations },
-    },
-    async (args: z.infer<S>, ctx: unknown) => {
-      const typedCtx = ctx as McpCtx;
-      const callerScopes = scopesOf(typedCtx);
+    { title, description, inputSchema, annotations: { ...annotations, openWorldHint: false } },
+    // The SDK infers args from the schema; our handler signature is the same shape.
+    (async (args: z.infer<S>, rawCtx: unknown) => {
+      const ctx = rawCtx as McpCtx;
+      if (!hasScope(scopesOf(ctx), scope)) return fail(`missing scope: ${scope}`);
 
-      // 1. Scope check
-      if (!hasScope(callerScopes, scope)) {
-        return fail(`missing scope: ${scope}`);
-      }
-
-      // 2. Run handler
       let result: ToolResult;
       try {
-        result = await handler(args, typedCtx);
+        result = await handler(args, ctx);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return fail(msg);
+        return fail(err instanceof Error ? err.message : String(err));
       }
 
-      // 3. Activity log for write / admin tools (best-effort)
-      if (scope !== 'read' && !result.isError) {
-        const actor = agentOf(typedCtx);
-        // Extract carousel id from common argument names
-        const a = args as Record<string, unknown>;
-        const carouselId =
-          typeof a.id === 'string'
-            ? a.id
-            : typeof a.carouselId === 'string'
-              ? a.carouselId
-              : null;
-        // Build a compact detail object without base64 blobs
-        const detail: Record<string, unknown> = { tool: name };
-        for (const [k, v] of Object.entries(a)) {
-          if (['slides', 'fonts', 'tokens', 'base64'].includes(k)) continue;
-          if (typeof v === 'string' && v.length > 500) continue;
-          detail[k] = v;
-        }
-        void logActivity(actor, name, carouselId, detail);
+      const { activity, ...out } = result;
+      if (scope !== 'read' && !out.isError) {
+        const a = (args ?? {}) as Record<string, unknown>;
+        const fromArgs = carouselArg && typeof a[carouselArg] === 'string' ? (a[carouselArg] as string) : null;
+        await logActivity(
+          agentOf(ctx),
+          name,
+          activity && 'carouselId' in activity ? activity.carouselId ?? null : fromArgs,
+          { ...compactDetail(a), ...activity?.detail },
+        );
       }
-
-      return result;
-    },
+      return out;
+    }) as never,
   );
 }

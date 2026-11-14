@@ -136,3 +136,21 @@ export async function completeRequest(id: string, agent: string, reply: string, 
 export async function setRequestStatus(id: string, status: RequestStatus) {
   await getDb().update(requests).set({ status, updatedAt: new Date() }).where(eq(requests.id, id));
 }
+
+// ---------- activity log ----------
+
+/** Best-effort: a failed log write never fails the action that caused it. */
+export async function logActivity(actor: string, action: string, carouselId?: string | null, detail?: Record<string, unknown> | null) {
+  try {
+    await getDb().insert(schema.activity).values({ actor, action, carouselId: carouselId ?? null, detail: detail ?? null });
+  } catch (err) {
+    console.error('activity log failed', action, err instanceof Error ? err.message : err);
+  }
+}
+
+export async function listActivity(filter: { carouselId?: string; limit?: number } = {}) {
+  const { activity } = schema;
+  return getDb().select().from(activity)
+    .where(filter.carouselId ? eq(activity.carouselId, filter.carouselId) : undefined)
+    .orderBy(desc(activity.createdAt)).limit(Math.min(filter.limit ?? 50, 200));
+}
