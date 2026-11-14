@@ -10,7 +10,8 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "key:create": "dotenv -e .env.local -- tsx scripts/create-key.ts",
     "brand:default": "node scripts/build-default-brand.mjs",
-    "brand:import": "dotenv -e .env.local -- tsx scripts/import-brand.ts"
+    "brand:import": "dotenv -e .env.local -- tsx scripts/import-brand.ts",
+    "mcp:smoke": "dotenv -e .env.local -- tsx scripts/mcp-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
