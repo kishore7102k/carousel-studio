@@ -20,7 +20,7 @@ You pin notes on slides ("code too small here"), and agents like Claude Code, Co
 1. Ask for a carousel (prompt) or start from the template.
 2. An agent claims the request, writes slides with `create_carousel`, which renders them.
 3. You click on a slide to pin a note. It lands in the queue.
-4. An agent claims it, calls `update_slides` (new version + render) and `complete_request` with a reply.
+4. An agent claims it, edits the slide (`edit_slide` or `update_slides`: new version + render) and calls `complete_request` with a reply.
 5. You approve and post.
 
 ## Deploy on Vercel
@@ -33,6 +33,7 @@ You pin notes on slides ("code too small here"), and agents like Claude Code, Co
    | --- | --- |
    | `STUDIO_PASSWORD` | Password for the web UI |
    | `STUDIO_SESSION_SECRET` | 32+ random bytes, e.g. `openssl rand -hex 32` |
+   | `STUDIO_URL` | Optional. Public URL used in links returned to agents (default: the Vercel production domain) |
 
 4. Create the tables once: `vercel env pull .env.local && npm run db:push`.
 5. Deploy, sign in, open **Agents** and create a key per agent.
@@ -71,16 +72,58 @@ http_headers = { Authorization = "Bearer <key>" }
 
 Then ask the agent: *"Check the carousel studio requests and handle them."*
 
+### Scopes
+
+Every key has a scope, chosen when you create it on the **Agents** page (or with the `create_key` tool):
+
+| Scope | Can |
+| --- | --- |
+| `read` | Look at carousels, versions, images, requests, the brand and the activity log. |
+| `write` | Everything in `read`, plus create and edit carousels and slides, render, trash/restore, and work the request queue. |
+| `admin` | Everything in `write`, plus brand changes, API key management and permanent delete. |
+
+A tool called without the needed scope returns the error `missing scope: write` (or `admin`).
+
 ### Tools
 
-| Tool | What it does |
-| --- | --- |
-| `get_brand_guide` | Workflow, slide format and the active brand's rules. Agents read this first. |
-| `list_carousels`, `get_carousel` | Browse carousels, versions, images and requests. |
-| `create_carousel`, `update_slides` | Write slides; every save is a new rendered version. |
-| `render_carousel`, `view_slides` | Re-render, or get the PNGs back as images to check them. |
-| `set_carousel_status` | draft → review → approved → posted. |
-| `list_requests`, `claim_request`, `complete_request` | The human's queue, with 30-minute leases. |
+Slide numbers in every tool input and output are **1-based**. Every slide change saves a **new version** from the current one and renders it (`render: false` skips rendering). Slide-editing tools take an optional `baseVersion`: if another agent saved first, the call fails with `stale: current version is N` instead of overwriting their work.
+
+| Tool | Scope | What it does |
+| --- | --- | --- |
+| `get_brand_guide` | read | Workflow, slide format and the active brand's rules. Agents read this first. |
+| `list_carousels` | read | Browse carousels; filter by `query`, `status`, `includeTrashed`, `limit`. |
+| `get_carousel` | read | Slides, images, version history and requests of one carousel. |
+| `create_carousel` | write | New carousel as version 1, rendered. |
+| `update_carousel` | write | Change title, tip number or status. (`set_carousel_status` is a deprecated alias.) |
+| `duplicate_carousel` | write | Copy a version into a new carousel. |
+| `delete_carousel` / `restore_carousel` | write | Move to trash / take out of trash. |
+| `purge_carousel` | admin | Delete forever (only from the trash), including its images. |
+| `set_current_version` | write | Point the carousel at an older or newer version. |
+| `compare_versions` | read | Slide-by-slide diff of two versions. |
+| `update_slides` | write | Replace all slides. |
+| `edit_slide`, `insert_slide`, `remove_slide`, `move_slide` | write | Targeted slide edits. |
+| `render_carousel` | write | Re-render a version. |
+| `view_slides` | read | The PNGs as images (plus their URLs as text). |
+| `get_download_links` | read | Image URLs in order with file names `01.png`… |
+| `list_requests`, `get_request` | read | The human's queue: notes pinned on slides and new-carousel prompts. |
+| `add_note`, `request_carousel` | write | Leave a note on a slide, or ask for a new carousel. |
+| `claim_request`, `complete_request` | write | Work a request with a 30-minute lease, then reply. |
+| `dismiss_request`, `reopen_request` | write | Close a request without doing it, or reopen one. |
+| `get_brand` | read | Brand name, handle, roles with colors, font families (never font data). |
+| `update_brand`, `import_brand`, `reset_brand` | admin | Edit, import (tokens + woff/woff2 fonts, max 2 MB) or reset the brand. |
+| `list_activity` | read | Who did what, newest first. |
+| `list_connections`, `create_key`, `revoke_access` | admin | Manage API keys (a key can't revoke itself). |
+| `search`, `fetch` | read | OpenAI-compatible search over carousels and requests (ids `carousel:<uuid>`, `request:<uuid>`). |
+
+Also exposed: the resource `studio://brand-guide` and the prompts `make_carousel` (topic → new carousel) and `handle_requests` (claim → fix → complete loop).
+
+### Trash and activity log
+
+Deleting a carousel (UI or `delete_carousel`) moves it to the **Trash** (gallery → Trash), where it can be restored or deleted forever. Every change by a human (`you`) or an agent (its key name) is written to an activity log, shown on each carousel page and readable with `list_activity`.
+
+### Smoke test
+
+With the dev server running (`npm run dev`), `npm run mcp:smoke` creates temporary keys, calls every tool against `STUDIO_URL` (default `http://localhost:3000`), checks scopes, stale versions, claim races, trash/purge and brand output, then deletes everything it created. It briefly changes the brand and restores it afterwards, so don't render carousels while it runs.
 
 ## Slide format
 

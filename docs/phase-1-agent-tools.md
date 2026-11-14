@@ -141,7 +141,7 @@ Work through these in order. **After finishing each item, tick it here and commi
 - [x] 11. Compat: search, fetch, `studio://brand-guide` resource, prompts
 - [x] 12. UI parity: key scopes, Trash filter, Duplicate, Activity list, UI actions log activity
 - [x] 13. `scripts/mcp-smoke.ts` + `npm run mcp:smoke` passing
-- [ ] 14. README updated; `npm run build` + `npm run lint` clean
+- [x] 14. README updated; `npm run build` + `npm run lint` clean
 
 ## 8. Definition of done
 
