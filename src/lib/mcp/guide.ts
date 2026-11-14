@@ -10,7 +10,7 @@ export const WORKFLOW = `Carousel Studio workflow for agents:
    - "new": create_carousel.
    Pass baseVersion (the version you read) on edits; a "stale" error means another agent saved first: re-read with get_carousel and redo the change.
 5. Optionally view_slides to check the rendered result.
-6. complete_request with a one-line reply and the resulting version. dismiss_request if it should not be done.
+6. complete_request with a one-line reply and the resulting version. dismiss_request if it should not be done (reopen_request undoes done/dismissed). add_note pins feedback on a slide; request_carousel queues a new-carousel prompt.
 
 Conventions:
 - Slide numbers in every tool input and output are 1-based (slide 1 = cover).
