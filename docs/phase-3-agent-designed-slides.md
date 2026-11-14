@@ -75,7 +75,7 @@ Animated slides / reels (Remotion, later), other canvas sizes (1:1, 9:16), AI im
 After finishing each item, tick it here and commit code + this file together. If you stop mid-item, add a one-line note under it.
 
 - [x] 1. Template snapshot hashes captured (before any render change) in `scripts/render-check.ts`
-- [ ] 2. `brand-layer.ts` split out of `html.ts`; templates byte/pixel-identical
+- [x] 2. `brand-layer.ts` split out of `html.ts`; templates byte/pixel-identical
 - [ ] 3. `DesignSlide` schema + sanitizer + `designHtml` + chrome
 - [ ] 4. Locked-down renderer (JS off, network allow-list, CSP) + `lintSlide`
 - [ ] 5. `preview_slide`, design slides accepted by create/update/edit/insert with warnings

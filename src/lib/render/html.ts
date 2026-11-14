@@ -1,33 +1,12 @@
-import { family, roleColor, type BrandPack, type Role } from '@/lib/brand';
+import type { BrandPack } from '@/lib/brand';
 import type { Slide } from '@/lib/slides';
-import { highlight } from './highlight';
+import { brandCss, codeRows, esc, foot, H, inline, W } from './brand-layer';
 
-export const W = 1080;
-export const H = 1350;
+export { W, H, inline };
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** Escape, then `code` → <code>, *phrase* → <mark>. */
-export function inline(s: string) {
-  const codes: string[] = [];
-  let out = esc(s).replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
-  out = out.replace(/\*([^*]+)\*/g, '<mark>$1</mark>');
-  return out.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[+i]}</code>`);
-}
-
-const VARS: [string, Role][] = [
-  ['paper', 'paper'], ['ink', 'ink'], ['muted', 'ink-muted'], ['line', 'line'], ['primary', 'primary'], ['on-primary', 'on-primary'],
-  ['bright', 'primary-bright'], ['marker', 'marker'], ['on-marker', 'on-marker'], ['code-bg', 'code-bg'], ['code-line', 'code-line'],
-  ['code-text', 'code-text'], ['kw', 'syntax-keyword'], ['str', 'syntax-string'], ['tag', 'syntax-tag'], ['cm', 'syntax-comment'],
-  ['add', 'diff-add'], ['rm', 'diff-remove'], ['accent', 'accent'],
-];
-
-// Slides are images: they never follow a viewer theme, so the brand's first theme is used.
-function css(b: BrandPack) {
-  const faces = b.fonts.map(f => `@font-face{font-family:'${f.family}';font-weight:${f.weight};src:url(data:font/woff2;base64,${f.data}) format('woff2')}`).join('');
-  const vars = VARS.map(([v, r]) => `--${v}:${roleColor(b, r)}`).join(';');
-  return `${faces}:root{${vars};--sans:${family(b, 'sans')};--mono:${family(b, 'mono')}}${BASE}`;
-}
+// Template layouts (cover, content, code, cta). The brand layer (fonts, role variables, footer, code rows) is in
+// brand-layer.ts. Template HTML must stay byte-identical: scripts/render-check.ts --check.
+const css = (b: BrandPack) => `${brandCss(b)}${BASE}`;
 
 const BASE = `
 *{box-sizing:border-box;margin:0}
@@ -59,22 +38,6 @@ code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:var
 .g{color:var(--cm)} .k{color:var(--kw)} .s{color:var(--str)} .tg{color:var(--tag)} .c{color:var(--cm)}
 .caption{margin-top:auto;font-weight:700;font-size:64px;line-height:1.08;letter-spacing:-0.03em;text-wrap:balance}
 `;
-
-const foot = (counter: string, handle: string) =>
-  `<div class="foot mono"><span><span class="dot"></span>${esc(handle)}</span><span>${counter}</span></div>`;
-
-function codeRows(code: string, diff: boolean) {
-  return code.split('\n').map(line => {
-    let cls = 'r', gutter = '';
-    if (diff && /^[-+] ?/.test(line)) {
-      cls += line[0] === '-' ? ' rm' : ' add';
-      gutter = `<span class="g">${line[0]} </span>`;
-      line = line.replace(/^[-+] ?/, '');
-    } else if (diff) gutter = '<span class="g">  </span>';
-    const body = highlight(line);
-    return `<span class="${cls}">${gutter}${cls.includes('rm') ? `<span class="t">${body}</span>` : body}</span>`;
-  }).join('');
-}
 
 export function slideHtml(slide: Slide, i: number, total: number, tipLabel: string, brand: BrandPack) {
   const counter = `${i + 1} / ${total}`;

@@ -1,5 +1,6 @@
 // Phase 3 render API for agent-designed slides. CONTRACT STUBS: Agent A implements (items 3-5).
-import type { BrandPack } from '@/lib/brand';
+import { family, roleColor, type BrandPack } from '@/lib/brand';
+import { CHROME_DOC, CLASSES, DESIGN_RULES, designVars, H, SAFE, typeScale, VARS, W } from './brand-layer';
 import type { DesignSlide, Slide } from '@/lib/slides';
 
 export type Lint = { errors: string[]; warnings: string[] };
@@ -36,6 +37,27 @@ export type DesignSystem = {
 
 /** The brand layer as data (for get_design_system and the brand guide). */
 export function designSystem(brand: BrandPack): DesignSystem {
-  void brand;
-  throw new Error('designSystem: not implemented yet (phase 3 item 2)');
+  const extra = designVars(brand);
+  return {
+    canvas: { width: W, height: H, safeInset: SAFE },
+    variables: [
+      ...VARS.map(([name, role, use]) => ({ name: `--${name}`, value: roleColor(brand, role), use })),
+      { name: '--surface', value: extra.surface, use: 'Raised panels and cards on paper' },
+      { name: '--sans', value: family(brand, 'sans'), use: 'Brand sans: headings and body' },
+      { name: '--mono', value: family(brand, 'mono'), use: 'Brand mono: code and small labels only' },
+      ...extra.spacing.map(t => ({ name: `--${t.name}`, value: t.value, use: t.usage ?? 'Spacing step' })),
+      ...extra.radii.map(t => ({ name: `--${t.name}`, value: t.value, use: t.usage ?? 'Corner radius' })),
+      ...typeScale(brand).map(t => ({ name: `--fs-${t.name}`, value: t.size, use: `Font size of .t-${t.name}` })),
+    ],
+    classes: CLASSES,
+    typeScale: typeScale(brand).map(t => ({
+      name: `.t-${t.name}`, size: t.size, weight: t.weight,
+      use: `${t.use} (${t.family}, line-height ${t.lineHeight}${t.tracking !== '0' ? `, tracking ${t.tracking}` : ''})`,
+    })),
+    spacing: Object.fromEntries(extra.spacing.map(t => [t.name, t.value])),
+    radii: Object.fromEntries(extra.radii.map(t => [t.name, t.value])),
+    fonts: { sans: family(brand, 'sans'), mono: family(brand, 'mono') },
+    chrome: CHROME_DOC,
+    rules: DESIGN_RULES,
+  };
 }
