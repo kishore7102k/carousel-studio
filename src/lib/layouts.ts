@@ -13,9 +13,19 @@ const TOKEN_RE = /\{\{\s*([A-Za-z][\w-]{0,39})\s*\}\}/g;
 
 export const placeholdersOf = (html: string): string[] => [...new Set([...html.matchAll(TOKEN_RE)].map(m => m[1]))];
 
-/** Replaces every {{name}} in one pass (values are never re-scanned) with the escaped value. */
+const escAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/**
+ * Replaces every {{name}} in one pass (values are never re-scanned).
+ * In text: escaped, with *marker* and `code` marks. Inside a tag (an attribute value such as src="{{img}}"):
+ * plain attribute escaping, no marks. The design sanitizer still runs on the result when the slide is saved.
+ */
 function fillHtml(html: string, fill: Record<string, string>): string {
-  return html.replace(TOKEN_RE, (_, k: string) => inline(fill[k] ?? ''));
+  return html.replace(TOKEN_RE, (_m, k: string, offset: number) => {
+    const before = html.slice(0, offset);
+    const inTag = before.lastIndexOf('<') > before.lastIndexOf('>');
+    return inTag ? escAttr(fill[k] ?? '') : inline(fill[k] ?? '');
+  });
 }
 
 export async function listLayouts(): Promise<Layout[]> {
