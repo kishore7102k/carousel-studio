@@ -12,6 +12,7 @@
     "brand:default": "node scripts/build-default-brand.mjs",
     "brand:import": "dotenv -e .env.local -- tsx scripts/import-brand.ts",
     "mcp:smoke": "dotenv -e .env.local -- tsx scripts/mcp-smoke.ts",
+    "design:smoke": "dotenv -e .env.local -- tsx scripts/design-smoke.ts",
     "oauth:smoke": "dotenv -e .env.local -- tsx scripts/oauth-smoke.ts"
   },
   "dependencies": {
