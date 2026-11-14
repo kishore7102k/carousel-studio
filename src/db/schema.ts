@@ -67,3 +67,49 @@ export const activity = pgTable('activity', {
   detail: jsonb('detail').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('activity_carousel_created').on(t.carouselId, t.createdAt)]);
+
+// ---------- OAuth 2.1 (phase 2): web agents (ChatGPT, Claude.ai, Gemini) connect by URL ----------
+// Every secret (code, token, client secret) is stored as a sha256 hash only.
+
+export const oauthClients = pgTable('oauth_clients', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientId: text('client_id').notNull().unique(),
+  secretHash: text('secret_hash'),
+  name: text('name').notNull(),
+  redirectUris: text('redirect_uris').array().notNull(),
+  tokenAuthMethod: text('token_auth_method', { enum: ['none', 'client_secret_post', 'client_secret_basic'] }).notNull().default('none'),
+  logoUri: text('logo_uri'),
+  clientUri: text('client_uri'),
+  source: text('source', { enum: ['dcr', 'cimd'] }).notNull(),
+  metadataFetchedAt: timestamp('metadata_fetched_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+});
+
+export const oauthCodes = pgTable('oauth_codes', {
+  codeHash: text('code_hash').primaryKey(),
+  clientId: text('client_id').notNull(),
+  redirectUri: text('redirect_uri').notNull(),
+  codeChallenge: text('code_challenge').notNull(),
+  scopes: text('scopes').array().notNull(),
+  resource: text('resource').notNull(),
+  /** Token family created when this code is exchanged; reuse of the code revokes the family. */
+  familyId: uuid('family_id').notNull().defaultRandom(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('oauth_codes_expires').on(t.expiresAt)]);
+
+export const oauthTokens = pgTable('oauth_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientId: text('client_id').notNull(),
+  kind: text('kind', { enum: ['access', 'refresh'] }).notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  scopes: text('scopes').array().notNull(),
+  resource: text('resource').notNull(),
+  familyId: uuid('family_id').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+}, t => [index('oauth_tokens_family').on(t.familyId), index('oauth_tokens_client').on(t.clientId)]);
