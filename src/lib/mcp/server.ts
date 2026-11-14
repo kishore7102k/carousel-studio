@@ -3,6 +3,7 @@ import { registerAccessTools } from './tools/access';
 import { registerBrandTools } from './tools/brand';
 import { registerCarouselTools } from './tools/carousels';
 import { registerCompatTools } from './tools/compat';
+import { registerDesignTools } from './tools/design';
 import { registerRenderTools } from './tools/render';
 import { registerRequestTools } from './tools/requests';
 import { registerSlideTools } from './tools/slides';
@@ -15,5 +16,6 @@ export function registerStudio(server: McpServer) {
   registerRenderTools(server);
   registerRequestTools(server);
   registerAccessTools(server);
+  registerDesignTools(server);
   registerCompatTools(server);
 }

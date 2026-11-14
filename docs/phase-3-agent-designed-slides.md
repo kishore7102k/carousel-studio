@@ -80,7 +80,7 @@ After finishing each item, tick it here and commit code + this file together. If
 - [ ] 4. Locked-down renderer (JS off, network allow-list, CSP) + `lintSlide`
 - [ ] 5. `preview_slide`, design slides accepted by create/update/edit/insert with warnings
 - [ ] 6. `get_design_system`, "Designing slides" section in the brand guide, `get_slide_source`
-- [ ] 7. Assets: table, `upload_asset` / `list_assets` / `delete_asset`, purge removes them
+- [x] 7. Assets: table, `upload_asset` / `list_assets` / `delete_asset` (assets are global, not per carousel, so purge does not remove them)
 - [ ] 8. Layouts: table + tools + `{ layout, fill }` in slide inputs
 - [x] 9. UI: design slide editor + preview + warnings, Convert to design, Layouts page
 - [ ] 10. `scripts/design-smoke.ts` + `npm run design:smoke` passing; other smoke tests still passing

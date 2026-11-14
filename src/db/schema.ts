@@ -115,3 +115,31 @@ export const oauthTokens = pgTable('oauth_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 }, t => [index('oauth_tokens_family').on(t.familyId), index('oauth_tokens_client').on(t.clientId)]);
+
+// ---------- Phase 3: agent-designed slides ----------
+
+// Uploaded images/SVG usable in design slides. Global (not per carousel).
+export const assets = pgTable('assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  url: text('url').notNull(),
+  kind: text('kind').notNull(),
+  bytes: integer('bytes').notNull(),
+  width: integer('width'),
+  height: integer('height'),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Named design slides with {{placeholders}}.
+export const layouts = pgTable('layouts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  description: text('description').notNull().default(''),
+  html: text('html').notNull(),
+  css: text('css').notNull().default(''),
+  placeholders: text('placeholders').array().notNull().default(sql`'{}'`),
+  thumbnail: text('thumbnail'),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
