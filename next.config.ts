@@ -9,7 +9,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@sparticuz/chromium", "playwright-core"],
   outputFileTracingIncludes: {
     "/api/mcp": chromiumBin,
-    "/c/[id]": chromiumBin,
+    // Keys are picomatch globs: "/c/[id]" would be a character class and match nothing.
+    "/c/*": chromiumBin,
     "/new": chromiumBin,
   },
 };
