@@ -1,7 +1,8 @@
 import { desc } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { getDb, schema } from '@/db';
-import { KeyForm, revokeKey } from './keys';
+import { KeyForm } from './keys';
+import { revokeKey } from './key-actions';
 
 export const dynamic = 'force-dynamic';
 

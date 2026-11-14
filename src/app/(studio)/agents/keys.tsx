@@ -2,8 +2,6 @@
 import { useActionState } from 'react';
 import { createKeyAction } from './key-actions';
 
-export { revokeKey } from './key-actions';
-
 export function KeyForm({ url }: { url: string }) {
   const [state, action, pending] = useActionState(createKeyAction, null);
   const snippet = state?.key
