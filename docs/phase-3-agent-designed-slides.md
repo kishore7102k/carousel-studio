@@ -77,7 +77,7 @@ After finishing each item, tick it here and commit code + this file together. If
 - [x] 1. Template snapshot hashes captured (before any render change) in `scripts/render-check.ts`
 - [x] 2. `brand-layer.ts` split out of `html.ts`; templates byte/pixel-identical
 - [x] 3. `DesignSlide` schema + sanitizer + `designHtml` + chrome
-- [ ] 4. Locked-down renderer (JS off, network allow-list, CSP) + `lintSlide`
+- [x] 4. Locked-down renderer (JS off, network allow-list, CSP) + `lintSlide`
 - [ ] 5. `preview_slide`, design slides accepted by create/update/edit/insert with warnings
 - [x] 6. `get_design_system`, "Designing slides" section in the brand guide, `get_slide_source`
 - [x] 7. Assets: table, `upload_asset` / `list_assets` / `delete_asset` (assets are global, not per carousel, so purge does not remove them)
