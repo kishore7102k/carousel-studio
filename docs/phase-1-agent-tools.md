@@ -139,7 +139,7 @@ Work through these in order. **After finishing each item, tick it here and commi
 - [x] 9. Brand tools: get_brand, update_brand, import_brand, reset_brand
 - [ ] 10. Access + activity tools: list_connections, create_key, revoke_access, list_activity
 - [ ] 11. Compat: search, fetch, `studio://brand-guide` resource, prompts
-- [ ] 12. UI parity: key scopes, Trash filter, Duplicate, Activity list, UI actions log activity
+- [x] 12. UI parity: key scopes, Trash filter, Duplicate, Activity list, UI actions log activity
 - [ ] 13. `scripts/mcp-smoke.ts` + `npm run mcp:smoke` passing
 - [ ] 14. README updated; `npm run build` + `npm run lint` clean
 

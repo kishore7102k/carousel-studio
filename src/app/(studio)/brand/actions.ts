@@ -1,5 +1,6 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { logActivity } from '@/lib/store';
 import { getBrand, resetBrand, saveBrand, ROLES, type BrandPack } from '@/lib/brand';
 
 const WEIGHTS: Record<string, string> = { thin: '100', extralight: '200', light: '300', regular: '400', book: '400', medium: '500', semibold: '600', bold: '700', extrabold: '800', black: '900' };
@@ -24,6 +25,7 @@ export async function updateBrandDetails(_prev: unknown, formData: FormData) {
     readme: String(formData.get('readme') ?? cur.readme),
     roles,
   });
+  await logActivity('you', 'update_brand', null);
   revalidatePath('/', 'layout');
   return { ok: 'Saved. New renders use these settings.' };
 }
@@ -56,11 +58,13 @@ export async function importBrandPack(_prev: unknown, formData: FormData) {
     fonts: fonts.length ? fonts : cur.fonts,
     readme: readmeFile?.size ? await readmeFile.text() : cur.readme,
   });
+  await logActivity('you', 'import_brand', null, { colors: tokens.color.tokens.length, fonts: fonts.length });
   revalidatePath('/', 'layout');
   return { ok: `Imported ${tokens.color.tokens.length} colors and ${fonts.length || 'no new'} fonts. Map roles below if your token names differ.` };
 }
 
 export async function resetToDefault() {
   await resetBrand();
+  await logActivity('you', 'reset_brand', null);
   revalidatePath('/', 'layout');
 }

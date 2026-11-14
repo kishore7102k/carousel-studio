@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition, type MouseEvent } from 'react';
 import type { Slide } from '@/lib/slides';
-import { addNote, deleteCarousel, dismissRequest, rerender, saveSlides, setStatus, switchVersion } from '@/app/actions';
+import { addNote, deleteCarousel, dismissRequest, duplicateCarousel, rerender, saveSlides, setStatus, switchVersion } from '@/app/actions';
 import { AutoRefresh } from '@/components/AutoRefresh';
 
 type Req = { id: string; kind: string; status: string; text: string; slideIndex: number | null; x: number | null; y: number | null; versionNumber: number | null; claimedBy: string | null; reply: string | null; resultVersion: number | null };
@@ -21,7 +21,9 @@ const blank: Record<Slide['kind'], Slide> = {
   cta: { kind: 'cta', hook: 'Save this for *later*.' },
 };
 
-export function CarouselView({ data }: { data: Data }) {
+type Act = { id: string; actor: string; action: string; createdAt: string };
+
+export function CarouselView({ data, activity }: { data: Data; activity: Act[] }) {
   const router = useRouter();
   const { carousel, version, versions, requests } = data;
   const [draftPin, setDraftPin] = useState<{ slide: number; x: number; y: number } | null>(null);
@@ -147,7 +149,8 @@ export function CarouselView({ data }: { data: Data }) {
             <div className="row">
               <button className="btn" onClick={() => setEditing(structuredClone(version.slides))}>Edit text</button>
               <button className="btn" disabled={pending} onClick={() => start(async () => { await rerender(carousel.id, version.number); router.refresh(); })}>{pending ? 'Working…' : 'Re-render'}</button>
-              <button className="btn danger" disabled={pending} onClick={() => { if (window.confirm(`Delete "${carousel.title}" and all its versions?`)) start(() => deleteCarousel(carousel.id)); }}>Delete</button>
+              <button className="btn danger" disabled={pending} onClick={() => { if (window.confirm(`Move "${carousel.title}" to trash?`)) start(() => deleteCarousel(carousel.id)); }}>Delete</button>
+              <button className="btn" disabled={pending} onClick={() => start(() => duplicateCarousel(carousel.id))}>Duplicate</button>
             </div>
           )}
         </div>
@@ -165,6 +168,13 @@ export function CarouselView({ data }: { data: Data }) {
               {r.reply && <p className="reply">{r.reply}{r.resultVersion ? <> · <Link href={`/c/${carousel.id}?v=${r.resultVersion}`}>see v{r.resultVersion}</Link></> : null}</p>}
               {r.status === 'open' && <button className="btn sm" disabled={pending} onClick={() => start(() => dismissRequest(r.id, carousel.id))}>Dismiss</button>}
             </div>
+          ))}
+          <h2 style={{ marginTop: 24 }}>Activity</h2>
+          {activity.length === 0 && <p className="muted">Nothing logged yet.</p>}
+          {activity.map(a => (
+            <p key={a.id} className="muted" style={{ margin: '4px 0', fontSize: 13 }}>
+              <b>{a.actor}</b> {a.action.replace(/_/g, ' ')} · {new Date(a.createdAt).toLocaleString()}
+            </p>
           ))}
         </aside>
       </div>

@@ -22,6 +22,14 @@ http_headers = { Authorization = "Bearer ${state.key}" }
         <label htmlFor="agent-name">Agent name</label>
         <input id="agent-name" name="name" required placeholder="claude-code, codex, cursor, nightly-script" />
       </div>
+      <div>
+        <label htmlFor="agent-scope">Access</label>
+        <select id="agent-scope" name="scope" defaultValue="write">
+          <option value="read">Read only</option>
+          <option value="write">Read + write</option>
+          <option value="admin">Admin (brand, keys, permanent delete)</option>
+        </select>
+      </div>
       <button className="btn primary" disabled={pending}>{pending ? 'Creating…' : 'Create key'}</button>
       {state?.key && (
         <>
