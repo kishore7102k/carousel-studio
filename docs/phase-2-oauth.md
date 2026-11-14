@@ -112,7 +112,7 @@ After finishing each item, tick it here and commit code + this file together. If
 
 - [x] 1. Schema: `oauth_clients`, `oauth_codes`, `oauth_tokens`; `npm run db:push`
   - Note: `oauth_codes.family_id` added (the token family a code creates) so code reuse can revoke that family. `token_hash` is unique, which is its index.
-- [ ] 2. `src/lib/oauth/*`: token/code generation + hashing, PKCE verify, scope + resource helpers, `studioUrl`-based issuer
+- [x] 2. `src/lib/oauth/*`: token/code generation + hashing, PKCE verify, scope + resource helpers, `studioUrl`-based issuer
 - [ ] 3. Discovery: protected resource + authorization server metadata routes (+ CORS); MCP 401 challenge via `resourceMetadataPath`
 - [ ] 4. DCR `/oauth/register` with validation + rate limit + lazy cleanup
 - [ ] 5. CIMD fetcher with SSRF guard + cache

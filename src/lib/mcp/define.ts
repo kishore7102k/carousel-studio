@@ -1,18 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { z } from 'zod';
 import { logActivity } from '@/lib/store';
+import { studioUrl } from '@/lib/url';
+
+export { studioUrl };
 
 // ---------- URL helpers ----------
-
-/** Public studio URL: STUDIO_URL, else the Vercel production domain, else localhost. */
-export function studioUrl(path = '') {
-  const base =
-    process.env.STUDIO_URL?.replace(/\/+$/, '') ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : 'http://localhost:3000');
-  return `${base}${path}`;
-}
 
 export const carouselUrl = (id: string) => studioUrl(`/c/${id}`);
 
