@@ -70,8 +70,9 @@ const loop = http.createServer((req, res) => {
   if (waiter) { const w = waiter; waiter = null; w(u.searchParams); } else stray++;
 });
 const nextCallback = (ms: number) => new Promise<URLSearchParams | null>(resolve => {
-  const t = setTimeout(() => { waiter = null; resolve(null); }, ms);
-  waiter = p => { clearTimeout(t); resolve(p); };
+  const mine = (p: URLSearchParams) => { clearTimeout(t); resolve(p); };
+  const t = setTimeout(() => { if (waiter === mine) waiter = null; resolve(null); }, ms);
+  waiter = mine; // a newer waiter supersedes an older one; the old one just times out
 });
 let REDIRECT = '';
 
@@ -285,7 +286,7 @@ async function main() {
       const c = await connect('readonly', 'read');
       const at = c.tok.body?.access_token ?? '';
       const rd = await mcp(at, 'list_carousels', { limit: 1 });
-      const wt = await mcp(at, 'create_carousel', { title: `oauth-smoke ${RUN}`, slides: [{ kind: 'cover', hook: 'x' }], render: false });
+      const wt = await mcp(at, 'create_carousel', { title: `oauth-smoke ${RUN}`, slides: [{ kind: 'cover', hook: 'Smoke *test*' }, { kind: 'cta', hook: 'Save *this*.' }], render: false });
       check('read-only token: read ok, write tool -> missing scope', rd.ok && !wt.ok && /missing scope/i.test(wt.text + wt.www), `read ${rd.status}; write ${wt.status} ${wt.text.slice(0, 150)}`);
     }
     {
@@ -369,6 +370,7 @@ async function main() {
       // clients the server created that never made it into our set (defensive sweep by name)
       const stale = await db.select({ clientId: schema.oauthClients.clientId }).from(schema.oauthClients).where(like(schema.oauthClients.name, `oauth-smoke-${RUN}-%`));
       await sweep(stale.map(x => x.clientId));
+      await db.delete(schema.carousels).where(like(schema.carousels.title, `oauth-smoke ${RUN}%`)); // only exists if scope enforcement failed
       await db.delete(schema.activity).where(like(schema.activity.actor, `oauth-smoke-${RUN}-%`));
       if (keyNames.length) await db.delete(schema.activity).where(inArray(schema.activity.actor, keyNames));
       await db.delete(schema.apiKeys).where(like(schema.apiKeys.name, `oauth-smoke-${RUN}-%`));
