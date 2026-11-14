@@ -120,7 +120,7 @@ After finishing each item, tick it here and commit code + this file together. If
 - [ ] 6. `/oauth/authorize` page + consent UI + signed-params check + `iss` in all responses; login `next` supports it
 - [ ] 7. `/oauth/token` (code + refresh, rotation, reuse detection) and `/oauth/revoke`
 - [ ] 8. MCP verifier accepts `sat_` tokens with audience check; activity actor = client name
-- [ ] 9. Proxy bypass for public OAuth routes
+- [x] 9. Proxy bypass for public OAuth routes
 - [ ] 10. Agents page: Connected apps list + Disconnect + "Connect a web app" instructions; Phase 1 access tools include OAuth connections
 - [ ] 11. `scripts/oauth-smoke.ts` + `npm run oauth:smoke` passing; `npm run mcp:smoke` still passing
 - [ ] 12. README: client support table (header keys vs OAuth), OAuth notes; build + lint clean
