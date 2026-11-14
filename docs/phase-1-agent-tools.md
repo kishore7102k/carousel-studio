@@ -133,7 +133,7 @@ Work through these in order. **After finishing each item, tick it here and commi
 - [x] 3. `src/lib/mcp/server.ts` + `defineTool` helper (scope check, errors, activity log); route.ts made thin
 - [x] 4. Move the 11 existing tools into `src/lib/mcp/tools/*` via `defineTool` (behavior unchanged + new params)
 - [x] 5. Carousel tools: update, duplicate, delete/restore/purge, set_current_version, compare_versions
-- [ ] 6. Slide tools: edit_slide, insert_slide, remove_slide, move_slide, `baseVersion` on update_slides
+- [x] 6. Slide tools: edit_slide, insert_slide, remove_slide, move_slide, `baseVersion` on update_slides
 - [ ] 7. Render tools: view_slides URLs, get_download_links
 - [x] 8. Request tools: get_request, add_note, request_carousel, dismiss_request, reopen_request
 - [x] 9. Brand tools: get_brand, update_brand, import_brand, reset_brand

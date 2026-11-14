@@ -2,7 +2,8 @@ import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from 'd
 import { del, list } from '@vercel/blob';
 import { getDb, schema } from '@/db';
 import { renderAndUpload } from '@/lib/render/render';
-import { Slides, type Slide } from '@/lib/slides';
+import type { z } from 'zod';
+import { Slide, Slides } from '@/lib/slides';
 import { getBrand, tipLabel } from '@/lib/brand';
 
 const { carousels, versions, requests } = schema;
@@ -60,21 +61,162 @@ export async function createCarousel(input: { title: string; tipNumber?: number 
   return { id: c.id, version: 1, images };
 }
 
-/** Saves slides as a NEW version (old versions are kept) and renders it. Throws "stale" if baseVersion is given and doesn't match. */
-export async function updateSlides(input: { id: string; slides: Slide[]; createdBy: string; note?: string; render?: boolean; baseVersion?: number }) {
-  const slides = Slides.parse(input.slides);
+/** Readable zod error: "2.title: Invalid input; ..." instead of a JSON dump. */
+export function zodMessage(err: z.ZodError) {
+  return err.issues.map(i => `${i.path.length ? i.path.join('.') + ': ' : ''}${i.message}`).join('; ');
+}
+
+const isUniqueViolation = (err: unknown) => {
+  const e = err as { code?: string; cause?: { code?: string } };
+  return e?.code === '23505' || e?.cause?.code === '23505';
+};
+
+/** JSON with sorted object keys: jsonb does not keep key order, so plain JSON.stringify can't compare a DB row with fresh data. */
+const canonical = (v: unknown): string => JSON.stringify(v, (_k, x) =>
+  x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x);
+
+type SlideEditInput = { id: string; createdBy: string; note?: string; render?: boolean; baseVersion?: number };
+
+/**
+ * Shared path for every slide change. Reads the CURRENT version, applies `fn` to a copy of its slides,
+ * validates the result and saves it as a NEW version, then renders it (render: false skips).
+ *
+ * neon-http has no transactions, so the version switch is a compare-and-swap:
+ *  1. insert the version row as max+1 (the unique (carousel_id, number) index rejects a racing duplicate → retry),
+ *  2. UPDATE carousels SET current_version = new WHERE current_version = expected AND not trashed RETURNING,
+ *  3. no row back → delete the inserted version and throw "stale: current version is N".
+ * expected = the version we read, so a concurrent write is never silently overwritten.
+ * `unconditional` (update_slides without baseVersion) skips the version check: the caller replaces everything anyway.
+ *
+ * If `fn` returns slides identical to the current ones, nothing is saved and `unchanged: true` is returned.
+ */
+export async function modifySlides(
+  input: SlideEditInput,
+  fn: (slides: Slide[]) => Slide[],
+  opts: { unconditional?: boolean } = {},
+) {
   const db = getDb();
   const [c] = await db.select().from(carousels).where(eq(carousels.id, input.id));
   if (!c) throw new Error(`carousel ${input.id} not found`);
+  if (c.deletedAt) throw new Error('carousel is in the trash; restore_carousel first');
   if (input.baseVersion != null && c.currentVersion !== input.baseVersion) {
     throw new Error(`stale: current version is ${c.currentVersion}`);
   }
-  const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${versions.number}), 0)::int` }).from(versions).where(eq(versions.carouselId, c.id));
-  const number = max + 1;
-  await db.insert(versions).values({ carouselId: c.id, number, slides, createdBy: input.createdBy, note: input.note ?? null });
-  await db.update(carousels).set({ currentVersion: number, status: 'review', updatedAt: new Date() }).where(eq(carousels.id, c.id));
+  const [cur] = await db.select({ slides: versions.slides, images: versions.images }).from(versions)
+    .where(and(eq(versions.carouselId, c.id), eq(versions.number, c.currentVersion)));
+  if (!cur) throw new Error(`current version ${c.currentVersion} not found`);
+
+  const parsed = Slides.safeParse(fn(structuredClone(cur.slides)));
+  if (!parsed.success) throw new Error(`invalid slides: ${zodMessage(parsed.error)}`);
+  const slides = parsed.data;
+  if (canonical(slides) === canonical(cur.slides)) {
+    return { id: c.id, version: c.currentVersion, previousVersion: c.currentVersion, unchanged: true, slides, images: cur.images };
+  }
+
+  // 1. Insert the new version row with the next free number.
+  let number = 0;
+  for (let attempt = 0; ; attempt++) {
+    const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${versions.number}), 0)::int` }).from(versions).where(eq(versions.carouselId, c.id));
+    number = max + 1;
+    try {
+      await db.insert(versions).values({ carouselId: c.id, number, slides, createdBy: input.createdBy, note: input.note ?? null });
+      break;
+    } catch (err) {
+      if (!isUniqueViolation(err) || attempt >= 3) throw err;
+    }
+  }
+
+  // 2. Compare-and-swap the current version.
+  const expected = opts.unconditional && input.baseVersion == null ? null : (input.baseVersion ?? c.currentVersion);
+  const [swapped] = await db.update(carousels).set({ currentVersion: number, status: 'review', updatedAt: new Date() })
+    .where(and(eq(carousels.id, c.id), isNull(carousels.deletedAt), expected == null ? undefined : eq(carousels.currentVersion, expected)))
+    .returning({ id: carousels.id });
+
+  // 3. Lost the race (or trashed meanwhile): undo the insert and report.
+  if (!swapped) {
+    await db.delete(versions).where(and(eq(versions.carouselId, c.id), eq(versions.number, number)));
+    const [now] = await db.select({ currentVersion: carousels.currentVersion, deletedAt: carousels.deletedAt }).from(carousels).where(eq(carousels.id, c.id));
+    if (!now) throw new Error(`carousel ${c.id} not found`);
+    if (now.deletedAt) throw new Error('carousel is in the trash; restore_carousel first');
+    throw new Error(`stale: current version is ${now.currentVersion}`);
+  }
+
   const images = input.render === false ? [] : await render(c.id, number, slides, c.tipNumber);
-  return { id: c.id, version: number, images };
+  return { id: c.id, version: number, previousVersion: c.currentVersion, unchanged: false, slides, images };
+}
+
+/** Replaces all slides as a NEW version (old versions are kept) and renders it. Throws "stale" if baseVersion is given and doesn't match. */
+export async function updateSlides(input: SlideEditInput & { slides: Slide[] }) {
+  const { slides, ...rest } = input;
+  const r = await modifySlides(rest, () => slides, { unconditional: true });
+  return { id: r.id, version: r.version, images: r.images, ...(r.unchanged ? { unchanged: true } : {}) };
+}
+
+/** Slide numbers here are 1-based (the MCP boundary). */
+const checkPos = (n: number, count: number, what = 'slide') => {
+  if (!Number.isInteger(n) || n < 1 || n > count) throw new Error(`${what} ${n} out of range: this version has ${count} slides (1-${count})`);
+};
+
+const slideShapes = Slide.options.map(o => ({ kind: o.shape.kind.value as string, keys: Object.keys(o.shape) }));
+
+/**
+ * Shallow-merges `patch` into slide n. A null value removes that field. `kind` may change only if the
+ * result validates; fields of the old kind that the new kind does not have are dropped (reported in `dropped`).
+ * Fields in the patch that the resulting kind does not know are an error (catches typos).
+ */
+export async function editSlide(input: SlideEditInput & { slide: number; patch: Record<string, unknown> }) {
+  let dropped: string[] = [];
+  const r = await modifySlides(input, slides => {
+    checkPos(input.slide, slides.length);
+    const merged: Record<string, unknown> = { ...slides[input.slide - 1] };
+    for (const [k, v] of Object.entries(input.patch)) {
+      if (v === null) delete merged[k]; else merged[k] = v;
+    }
+    const shape = slideShapes.find(s => s.kind === merged.kind);
+    if (!shape) throw new Error(`invalid kind ${JSON.stringify(merged.kind)}: use ${slideShapes.map(s => s.kind).join(', ')}`);
+    const unknown = Object.keys(input.patch).filter(k => input.patch[k] !== null && !shape.keys.includes(k));
+    if (unknown.length) throw new Error(`unknown field(s) for a ${shape.kind} slide: ${unknown.join(', ')}. Valid: ${shape.keys.join(', ')}`);
+    dropped = Object.keys(merged).filter(k => !shape.keys.includes(k));
+    const one = Slide.safeParse(merged);
+    if (!one.success) throw new Error(`slide ${input.slide} would be invalid: ${zodMessage(one.error)}`);
+    slides[input.slide - 1] = one.data;
+    return slides;
+  });
+  return { ...r, slide: input.slide, dropped };
+}
+
+/** Inserts a slide BEFORE position `at` (1-based); at = count+1 appends. */
+export async function insertSlide(input: SlideEditInput & { at: number; slide: Slide }) {
+  return modifySlides(input, slides => {
+    if (!Number.isInteger(input.at) || input.at < 1 || input.at > slides.length + 1) {
+      throw new Error(`position ${input.at} out of range: this version has ${slides.length} slides; use 1-${slides.length + 1} (${slides.length + 1} appends)`);
+    }
+    slides.splice(input.at - 1, 0, input.slide);
+    return slides;
+  });
+}
+
+/** Removes slide n (1-based). Refuses to leave fewer than 2 slides. */
+export async function removeSlide(input: SlideEditInput & { slide: number }) {
+  const removed: Slide[] = [];
+  const r = await modifySlides(input, slides => {
+    checkPos(input.slide, slides.length);
+    if (slides.length - 1 < 2) throw new Error(`cannot remove: a carousel needs at least 2 slides and this version has ${slides.length}`);
+    removed.push(...slides.splice(input.slide - 1, 1));
+    return slides;
+  });
+  return { ...r, removed: removed[0] };
+}
+
+/** Moves slide `from` to position `to` (both 1-based, positions in the resulting order). */
+export async function moveSlide(input: SlideEditInput & { from: number; to: number }) {
+  return modifySlides(input, slides => {
+    checkPos(input.from, slides.length, 'from');
+    checkPos(input.to, slides.length, 'to');
+    const [s] = slides.splice(input.from - 1, 1);
+    slides.splice(input.to - 1, 0, s);
+    return slides;
+  });
 }
 
 export async function renderCarousel(id: string, version?: number) {
