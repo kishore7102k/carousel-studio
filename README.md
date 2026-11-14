@@ -51,6 +51,26 @@ Rendering locally uses an installed Chrome or Edge (`CHROME_PATH` to override). 
 
 ## Connect an agent
 
+There are two ways in, both at the same URL `https://<your-app>/api/mcp`:
+
+| Client | How it signs in |
+| --- | --- |
+| Claude Code, Codex, Cursor, Antigravity, scripts | **API key** in an `Authorization: Bearer ks_…` header (below) |
+| ChatGPT (developer mode), Claude.ai (custom connector, web/desktop/mobile), Gemini app | **OAuth**: paste the URL only, sign in with the studio password, choose scopes, Allow |
+| MCP Inspector | Either |
+
+### Web apps (OAuth)
+
+- **ChatGPT**: Settings → Apps & Connectors → Advanced → Developer mode on → Create / "Add custom MCP server" → URL `https://<your-app>/api/mcp`, Authentication **OAuth** → sign in → Allow.
+- **Claude.ai**: Settings → Connectors → Add custom connector → URL → Connect → sign in → Allow.
+- **Gemini app**: Settings → Connected apps → Add custom app (MCP) → URL → sign in → Allow (availability depends on Google's region and plan).
+
+Connected apps show up on the **Agents** page next to the API keys, with their scopes and last use. **Disconnect** revokes all their tokens; the activity log names them by client name (e.g. `ChatGPT`).
+
+How it works: the studio is its own OAuth 2.1 authorization server (authorization code + PKCE S256 only) and `/api/mcp` is the protected resource. It serves RFC 9728 / RFC 8414 discovery documents under `/.well-known/`, dynamic client registration (`/oauth/register`) and Client ID Metadata Documents (an `https://` URL as `client_id`, fetched with an SSRF guard), token rotation with reuse detection, revocation (`/oauth/revoke`), `iss` on every authorization response (RFC 9207) and audience-bound tokens (RFC 8707). Access tokens last 1 hour, refresh tokens 60 days. Tokens, codes and client secrets are stored as SHA-256 hashes only. The single "user" who consents is whoever knows `STUDIO_PASSWORD`. Set `STUDIO_URL` to your public URL if it isn't the Vercel production domain, because the OAuth issuer and token audience are derived from it.
+
+### API keys
+
 Create a key on the **Agents** page, then:
 
 ```bash
@@ -125,6 +145,8 @@ Deleting a carousel (UI or `delete_carousel`) moves it to the **Trash** (gallery
 
 With the dev server running (`npm run dev`), `npm run mcp:smoke` creates temporary keys, calls every tool against `STUDIO_URL` (default `http://localhost:3000`), checks scopes, stale versions, claim races, trash/purge and brand output, then deletes everything it created. It briefly changes the brand and restores it afterwards, so don't render carousels while it runs.
 
+`npm run oauth:smoke` tests the OAuth side against the dev server: discovery documents, registration, the real login and consent pages (driven in a local Chrome/Edge via Playwright), the PKCE token exchange, an MCP call with the token, and the failure cases (wrong verifier, reused code, wrong redirect URI or resource, `plain` PKCE, expired token, refresh-token reuse, read-only scope, disconnected app, SSRF-guarded metadata URLs). It removes every client and token it created.
+
 ## Slide format
 
 ```json
@@ -152,7 +174,7 @@ Slides paint with **roles** (`primary`, `paper`, `ink`, `marker`, `code-bg`, …
 
 - The UI is protected by a single password (signed, httpOnly session cookie). The MCP endpoint uses per-agent bearer keys stored as SHA-256 hashes.
 - Rendered PNGs are public Blob URLs under unguessable paths.
-- OAuth for web connectors (ChatGPT, Claude.ai) is not implemented yet.
+- Web connectors use OAuth 2.1 (see "Web apps"): PKCE S256, single-use 60-second codes, exact redirect URI matching (port ignored only for loopback), refresh rotation with reuse detection, audience-bound tokens, and a consent screen that shows the client's real redirect host.
 
 ## Stack
 

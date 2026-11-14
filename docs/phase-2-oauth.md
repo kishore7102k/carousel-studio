@@ -121,8 +121,8 @@ After finishing each item, tick it here and commit code + this file together. If
 - [x] 8. MCP verifier accepts `sat_` tokens with audience check; activity actor = client name
 - [x] 9. Proxy bypass for public OAuth routes
 - [x] 10. Agents page: Connected apps list + Disconnect + "Connect a web app" instructions; Phase 1 access tools include OAuth connections
-- [ ] 11. `scripts/oauth-smoke.ts` + `npm run oauth:smoke` passing; `npm run mcp:smoke` still passing
-- [ ] 12. README: client support table (header keys vs OAuth), OAuth notes; build + lint clean
+- [x] 11. `scripts/oauth-smoke.ts` + `npm run oauth:smoke` passing; `npm run mcp:smoke` still passing
+- [x] 12. README: client support table (header keys vs OAuth), OAuth notes; build + lint clean
 - [ ] 13. Manual checks after deploy: MCP Inspector, Claude.ai, ChatGPT, Gemini (write the result of each here)
 
 ## 10. Definition of done
