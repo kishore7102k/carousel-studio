@@ -1,0 +1,18 @@
+{
+  "1-cover": {
+    "html": "f419d5c705d30fc5d0687d0d8aa95566377e21d29bb1d6609c6f82cbdd812fa4",
+    "png": "c5f7f4485aabfd6dea9732a5e3d3f387d9285f7b1c8470897ef79f6bfb56f87f"
+  },
+  "2-content": {
+    "html": "73af49c59884b882060fc20661e0fbd90bc0e934dbb11695431ae27b49ff38ca",
+    "png": "5b12269055359364d3cade167560477040d498e7a79d0b432717d3390d59e1da"
+  },
+  "3-code": {
+    "html": "92f1e6149eabf8c0b98fcac8bb59f067e0821eccd86bddd844b7576d74ec41ba",
+    "png": "4075365e45966d2c776abf38e65cfbd64cbb8ab7b04ecbb41480b87f48b88964"
+  },
+  "4-cta": {
+    "html": "c508b935899f1e57807b54c78c7807edddfa3e60363db851567a7b46bdcfbba2",
+    "png": "920a96ff130e30dec094fe1fef69d3efcf181fd52d3a710d92ffc48bd843a940"
+  }
+}

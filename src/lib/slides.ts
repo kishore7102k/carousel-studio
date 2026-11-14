@@ -49,3 +49,29 @@ export const starterSlides = (): Slide[] => [
   { kind: 'code', file: 'example.ts', code: '- oldWay()\n+ newWay()', diff: true, caption: 'Less code, *same result*.' },
   { kind: 'cta', hook: 'Save this for your *next project*.', sub: 'One dev tip, four days a week.' },
 ];
+
+// ---------- Phase 3: agent-designed slides ----------
+// Contract only: Agent A adds DesignSlide to the `Slide` union (item 3) once the renderer handles it.
+
+/** Brand chrome the studio draws on a design slide: auto = handle footer + "n / total". */
+export const Chrome = z.enum(['auto', 'none', 'handle', 'counter']);
+export type Chrome = z.infer<typeof Chrome>;
+
+export const DesignSlide = z.object({
+  kind: z.literal('design'),
+  html: z.string().min(1).max(60_000).describe('Slide body HTML (no <html>/<head>/<script>). 1080x1350 canvas, brand CSS variables and classes available. See get_brand_guide "Designing slides".'),
+  css: z.string().max(30_000).optional().describe('CSS for this slide only (scoped by the studio).'),
+  chrome: Chrome.optional().describe('Brand chrome drawn by the studio: auto (default: handle + counter), handle, counter, none.'),
+  name: z.string().max(80).optional().describe('Short label for humans, e.g. "big number", "comparison".'),
+  notes: z.string().max(2000).optional().describe('Design intent; not rendered.'),
+});
+export type DesignSlide = z.infer<typeof DesignSlide>;
+
+/** Input-only: a design slide made from a saved layout. Resolved to a DesignSlide before saving. */
+export const LayoutRef = z.object({
+  kind: z.literal('design'),
+  layout: z.string().min(1).describe('Name of a saved layout (list_layouts).'),
+  fill: z.record(z.string(), z.string()).optional().describe('Placeholder values; text supports *marker* and `code`.'),
+  chrome: Chrome.optional(),
+});
+export type LayoutRef = z.infer<typeof LayoutRef>;
