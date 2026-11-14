@@ -114,6 +114,7 @@ After finishing each item, tick it here and commit code + this file together. If
   - Note: `oauth_codes.family_id` added (the token family a code creates) so code reuse can revoke that family. `token_hash` is unique, which is its index.
 - [x] 2. `src/lib/oauth/*`: token/code generation + hashing, PKCE verify, scope + resource helpers, `studioUrl`-based issuer
 - [ ] 3. Discovery: protected resource + authorization server metadata routes (+ CORS); MCP 401 challenge via `resourceMetadataPath`
+  - Note: MCP 401 challenge done (route.ts, resourceMetadataPath + resourceUrl = issuer). Metadata routes still to do.
 - [ ] 4. DCR `/oauth/register` with validation + rate limit + lazy cleanup
 - [ ] 5. CIMD fetcher with SSRF guard + cache
 - [ ] 6. `/oauth/authorize` page + consent UI + signed-params check + `iss` in all responses; login `next` supports it
