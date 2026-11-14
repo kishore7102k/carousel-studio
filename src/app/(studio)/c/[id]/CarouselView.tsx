@@ -5,6 +5,7 @@ import { useState, useTransition, type MouseEvent } from 'react';
 import type { Slide } from '@/lib/slides';
 import { addNote, deleteCarousel, dismissRequest, duplicateCarousel, rerender, saveSlides, setStatus, switchVersion } from '@/app/actions';
 import { AutoRefresh } from '@/components/AutoRefresh';
+import { LocalTime } from '@/components/LocalTime';
 
 type Req = { id: string; kind: string; status: string; text: string; slideIndex: number | null; x: number | null; y: number | null; versionNumber: number | null; claimedBy: string | null; reply: string | null; resultVersion: number | null };
 type Data = {
@@ -173,7 +174,7 @@ export function CarouselView({ data, activity }: { data: Data; activity: Act[] }
           {activity.length === 0 && <p className="muted">Nothing logged yet.</p>}
           {activity.map(a => (
             <p key={a.id} className="muted" style={{ margin: '4px 0', fontSize: 13 }}>
-              <b>{a.actor}</b> {a.action.replace(/_/g, ' ')} · {new Date(a.createdAt).toLocaleString()}
+              <b>{a.actor}</b> {a.action.replace(/_/g, ' ')} · <LocalTime value={a.createdAt} />
             </p>
           ))}
         </aside>

@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/LocalTime';
 import Link from 'next/link';
 import { listCarousels } from '@/lib/store';
 import { purgeCarousel, restoreCarousel } from '@/app/actions';
@@ -61,7 +62,7 @@ async function Trash() {
                 {c.cover ? <img src={c.cover} alt={`${c.title} cover`} loading="lazy" /> : <span className="mono">Not rendered</span>}
               </div>
               <span className="card-title">{c.title}</span>
-              <span className="muted">deleted {c.deletedAt?.toLocaleDateString()}</span>
+              <span className="muted">deleted {c.deletedAt && <LocalTime value={c.deletedAt} dateOnly />}</span>
               <span className="row">
                 <form action={restoreCarousel.bind(null, c.id)}><button className="btn sm">Restore</button></form>
                 <form action={purgeCarousel.bind(null, c.id)}><button className="btn sm danger">Delete forever</button></form>

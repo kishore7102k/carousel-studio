@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/LocalTime';
 import { headers } from 'next/headers';
 import { listKeys } from '@/lib/auth';
 import { KeyForm } from './keys';
@@ -24,7 +25,7 @@ export default async function Agents() {
           {keys.length === 0 && <p className="muted">No keys yet.</p>}
           {keys.map(k => (
             <div key={k.id} className="req">
-              <span className="row"><b>{k.name}</b>{k.scopes.map(sc => <span key={sc} className="chip">{sc}</span>)}<span className="muted">last used {k.lastUsedAt ? k.lastUsedAt.toLocaleString() : 'never'}</span></span>
+              <span className="row"><b>{k.name}</b>{k.scopes.map(sc => <span key={sc} className="chip">{sc}</span>)}<span className="muted">last used {k.lastUsedAt ? <LocalTime value={k.lastUsedAt} /> : 'never'}</span></span>
               <form action={revokeKey.bind(null, k.id)}><button className="btn sm danger">Revoke</button></form>
             </div>
           ))}
@@ -32,7 +33,7 @@ export default async function Agents() {
           {apps.length === 0 && <p className="muted">No web apps connected.</p>}
           {apps.map(a => (
             <div key={a.id} className="req">
-              <span className="row"><b>{a.name}</b><span className="muted">{a.redirectHost}</span>{a.scopes.map(sc => <span key={sc} className="chip">{sc}</span>)}<span className="muted">connected {a.connectedAt.toLocaleString()}</span><span className="muted">last used {a.lastUsedAt ? a.lastUsedAt.toLocaleString() : 'never'}</span></span>
+              <span className="row"><b>{a.name}</b><span className="muted">{a.redirectHost}</span>{a.scopes.map(sc => <span key={sc} className="chip">{sc}</span>)}<span className="muted">connected {<LocalTime value={a.connectedAt} />}</span><span className="muted">last used {a.lastUsedAt ? <LocalTime value={a.lastUsedAt} /> : 'never'}</span></span>
               <form action={disconnectApp.bind(null, a.id)}><button className="btn sm danger">Disconnect</button></form>
             </div>
           ))}
