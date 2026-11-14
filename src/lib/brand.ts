@@ -21,8 +21,8 @@ let cache: { pack: BrandPack; at: number } | null = null;
 const TTL = 30_000;
 
 /** The active brand: the one saved in the database, else the bundled default (OFL fonts). */
-export async function getBrand(): Promise<BrandPack> {
-  if (cache && Date.now() - cache.at < TTL) return cache.pack;
+export async function getBrand(opts: { fresh?: boolean } = {}): Promise<BrandPack> {
+  if (!opts.fresh && cache && Date.now() - cache.at < TTL) return cache.pack;
   const [row] = await getDb().select().from(schema.brand).where(eq(schema.brand.id, 'default'));
   const pack = row ? (row.pack as BrandPack) : DEFAULT_PACK;
   cache = { pack, at: Date.now() };
