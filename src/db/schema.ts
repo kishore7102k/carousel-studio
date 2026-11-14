@@ -19,6 +19,8 @@ export const versions = pgTable('versions', {
   number: integer('number').notNull(),
   slides: jsonb('slides').$type<Slide[]>().notNull(),
   images: jsonb('images').$type<string[]>().notNull().default([]),
+  /** Per-slide checks from the last render (design slides; null for templates), aligned with `slides`. */
+  lint: jsonb('lint').$type<({ errors: string[]; warnings: string[] } | null)[]>(),
   createdBy: text('created_by').notNull(),
   note: text('note'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

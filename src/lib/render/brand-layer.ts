@@ -193,6 +193,9 @@ pre.editor{white-space:pre;padding:40px}
 .card{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:32px;padding:48px}
 .primary .card{background:color-mix(in srgb,var(--on-primary) 8%,transparent);border-color:color-mix(in srgb,var(--on-primary) 24%,transparent);color:var(--on-primary)}
 .dark .card{background:color-mix(in srgb,var(--code-text) 6%,transparent);border-color:var(--code-line);color:var(--code-text)}
+.card.paper{background:var(--paper);color:var(--ink);border-color:var(--line)}
+.card.primary{background:var(--primary);color:var(--on-primary);border-color:transparent}
+.card.dark{background:var(--code-bg);color:var(--code-text);border-color:var(--code-line)}
 .rows{list-style:none;padding:0}
 .rows>*{padding:24px 0;border-top:1px solid var(--line)}
 .primary .rows>*,.dark .rows>*{border-top-color:color-mix(in srgb,currentColor 24%,transparent)}

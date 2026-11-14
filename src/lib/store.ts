@@ -1,7 +1,9 @@
 import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { del, list } from '@vercel/blob';
 import { getDb, schema } from '@/db';
-import { renderAndUpload } from '@/lib/render/render';
+import { renderPages, renderSlides, uploadPngs, type Lint } from '@/lib/render/render';
+import { slideHtml } from '@/lib/render/html';
+import { cleanDesignSlide } from '@/lib/render/design';
 import type { z } from 'zod';
 import { Slide, Slides } from '@/lib/slides';
 import { getBrand, tipLabel } from '@/lib/brand';
@@ -45,20 +47,71 @@ export async function getCarousel(id: string, version?: number) {
   return { carousel: c, version: v ?? null, versions: all, requests: reqs };
 }
 
-async function render(id: string, number: number, slides: Slide[], tip: number | null) {
+/** Per-slide warnings in tool output: only slides that have some, 1-based. */
+export type SlideWarnings = { n: number; warnings: string[] }[];
+const slideWarnings = (lint: (Lint | null)[]): SlideWarnings =>
+  lint.flatMap((l, i) => (l?.warnings.length ? [{ n: i + 1, warnings: l.warnings }] : []));
+
+/** Validates slides and sanitizes design slides. Returns the clean slides and the sanitizer's notes per slide. */
+function prepareSlides(input: unknown): { slides: Slide[]; notes: string[][] } {
+  const parsed = Slides.safeParse(input);
+  if (!parsed.success) throw new Error(`invalid slides: ${zodMessage(parsed.error)}`);
+  const notes: string[][] = [];
+  const slides = parsed.data.map((s, i) => {
+    if (s.kind !== 'design') { notes.push([]); return s; }
+    try {
+      const c = cleanDesignSlide(s);
+      notes.push(c.warnings);
+      return c.slide;
+    } catch (err) {
+      throw new Error(`slide ${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+  return { slides, notes };
+}
+
+/**
+ * Renders (and lints design slides) BEFORE saving: lint errors (content off the canvas) refuse the save.
+ * render false: only design slides are rendered, for lint; no PNGs.
+ * Returns the PNGs (null when not rendered) and the per-slide lint, sanitizer notes merged into warnings.
+ */
+async function renderChecked(slides: Slide[], tip: number | null, notes: string[][], render: boolean) {
   const brand = await getBrand();
-  const images = await renderAndUpload(id, number, slides, tipLabel(brand, tip), brand);
+  const label = tipLabel(brand, tip);
+  let pngs: Buffer[] | null = null;
+  let lint: (Lint | null)[] = slides.map(() => null);
+  if (render) {
+    const r = await renderSlides(slides, label, brand);
+    pngs = r.map(x => x.png);
+    lint = r.map(x => x.lint);
+  } else if (slides.some(s => s.kind === 'design')) {
+    const idx = slides.flatMap((s, i) => (s.kind === 'design' ? [i] : []));
+    const r = await renderPages(idx.map(i => ({ html: slideHtml(slides[i], i, slides.length, label, brand), lint: true })), brand);
+    idx.forEach((i, k) => { lint[i] = r[k].lint; });
+  }
+  lint = lint.map((l, i) => (l || notes[i]?.length ? { errors: l?.errors ?? [], warnings: [...(notes[i] ?? []), ...(l?.warnings ?? [])] } : null));
+  const errors = lint.flatMap((l, i) => (l?.errors.length ? [`slide ${i + 1}: ${l.errors.join('; ')}`] : []));
+  if (errors.length) throw new Error(`refused (nothing saved): ${errors.join(' | ')}. Fix and retry; preview_slide checks a slide without saving.`);
+  return { pngs, lint };
+}
+
+async function saveImages(id: string, number: number, pngs: Buffer[] | null) {
+  if (!pngs) return [];
+  const images = await uploadPngs(id, number, pngs);
   await getDb().update(versions).set({ images }).where(and(eq(versions.carouselId, id), eq(versions.number, number)));
   return images;
 }
 
 export async function createCarousel(input: { title: string; tipNumber?: number | null; slides: Slide[]; createdBy: string; note?: string; render?: boolean }) {
-  const slides = Slides.parse(input.slides);
+  const { slides, notes } = prepareSlides(input.slides);
+  const tip = input.tipNumber ?? null;
+  const { pngs, lint } = await renderChecked(slides, tip, notes, input.render !== false);
   const db = getDb();
-  const [c] = await db.insert(carousels).values({ title: input.title, tipNumber: input.tipNumber ?? null, status: 'review' }).returning();
-  await db.insert(versions).values({ carouselId: c.id, number: 1, slides, createdBy: input.createdBy, note: input.note ?? 'First version' });
-  const images = input.render === false ? [] : await render(c.id, 1, slides, c.tipNumber);
-  return { id: c.id, version: 1, images };
+  const [c] = await db.insert(carousels).values({ title: input.title, tipNumber: tip, status: 'review' }).returning();
+  await db.insert(versions).values({ carouselId: c.id, number: 1, slides, lint, createdBy: input.createdBy, note: input.note ?? 'First version' });
+  const images = await saveImages(c.id, 1, pngs);
+  const warnings = slideWarnings(lint);
+  return { id: c.id, version: 1, images, ...(warnings.length ? { warnings } : {}) };
 }
 
 /** Readable zod error: "2.title: Invalid input; ..." instead of a JSON dump. */
@@ -106,12 +159,11 @@ export async function modifySlides(
     .where(and(eq(versions.carouselId, c.id), eq(versions.number, c.currentVersion)));
   if (!cur) throw new Error(`current version ${c.currentVersion} not found`);
 
-  const parsed = Slides.safeParse(fn(structuredClone(cur.slides)));
-  if (!parsed.success) throw new Error(`invalid slides: ${zodMessage(parsed.error)}`);
-  const slides = parsed.data;
+  const { slides, notes } = prepareSlides(fn(structuredClone(cur.slides)));
   if (canonical(slides) === canonical(cur.slides)) {
-    return { id: c.id, version: c.currentVersion, previousVersion: c.currentVersion, unchanged: true, slides, images: cur.images };
+    return { id: c.id, version: c.currentVersion, previousVersion: c.currentVersion, unchanged: true, slides, images: cur.images, warnings: [] as SlideWarnings };
   }
+  const { pngs, lint } = await renderChecked(slides, c.tipNumber, notes, input.render !== false);
 
   // 1. Insert the new version row with the next free number.
   let number = 0;
@@ -119,7 +171,7 @@ export async function modifySlides(
     const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${versions.number}), 0)::int` }).from(versions).where(eq(versions.carouselId, c.id));
     number = max + 1;
     try {
-      await db.insert(versions).values({ carouselId: c.id, number, slides, createdBy: input.createdBy, note: input.note ?? null });
+      await db.insert(versions).values({ carouselId: c.id, number, slides, lint, createdBy: input.createdBy, note: input.note ?? null });
       break;
     } catch (err) {
       if (!isUniqueViolation(err) || attempt >= 3) throw err;
@@ -141,15 +193,15 @@ export async function modifySlides(
     throw new Error(`stale: current version is ${now.currentVersion}`);
   }
 
-  const images = input.render === false ? [] : await render(c.id, number, slides, c.tipNumber);
-  return { id: c.id, version: number, previousVersion: c.currentVersion, unchanged: false, slides, images };
+  const images = await saveImages(c.id, number, pngs);
+  return { id: c.id, version: number, previousVersion: c.currentVersion, unchanged: false, slides, images, warnings: slideWarnings(lint) };
 }
 
 /** Replaces all slides as a NEW version (old versions are kept) and renders it. Throws "stale" if baseVersion is given and doesn't match. */
 export async function updateSlides(input: SlideEditInput & { slides: Slide[] }) {
   const { slides, ...rest } = input;
   const r = await modifySlides(rest, () => slides, { unconditional: true });
-  return { id: r.id, version: r.version, images: r.images, ...(r.unchanged ? { unchanged: true } : {}) };
+  return { id: r.id, version: r.version, images: r.images, ...(r.unchanged ? { unchanged: true } : {}), ...(r.warnings.length ? { warnings: r.warnings } : {}) };
 }
 
 /** Slide numbers here are 1-based (the MCP boundary). */
@@ -222,8 +274,14 @@ export async function moveSlide(input: SlideEditInput & { from: number; to: numb
 export async function renderCarousel(id: string, version?: number) {
   const got = await getCarousel(id, version);
   if (!got?.version) throw new Error('carousel or version not found');
-  const images = await render(id, got.version.number, got.version.slides, got.carousel.tipNumber);
-  return { id, version: got.version.number, images };
+  const brand = await getBrand();
+  const r = await renderSlides(got.version.slides, tipLabel(brand, got.carousel.tipNumber), brand);
+  const lint = r.map(x => x.lint);
+  const images = await uploadPngs(id, got.version.number, r.map(x => x.png));
+  await getDb().update(versions).set({ images, lint }).where(and(eq(versions.carouselId, id), eq(versions.number, got.version.number)));
+  const warnings = slideWarnings(lint);
+  const errors = lint.flatMap((l, i) => (l?.errors.length ? [{ n: i + 1, errors: l.errors }] : []));
+  return { id, version: got.version.number, images, ...(warnings.length ? { warnings } : {}), ...(errors.length ? { errors } : {}) };
 }
 
 export async function updateCarousel(id: string, patch: { status?: Status; title?: string; tipNumber?: number | null; currentVersion?: number }) {

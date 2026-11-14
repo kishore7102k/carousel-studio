@@ -76,7 +76,7 @@ After finishing each item, tick it here and commit code + this file together. If
 
 - [x] 1. Template snapshot hashes captured (before any render change) in `scripts/render-check.ts`
 - [x] 2. `brand-layer.ts` split out of `html.ts`; templates byte/pixel-identical
-- [ ] 3. `DesignSlide` schema + sanitizer + `designHtml` + chrome
+- [x] 3. `DesignSlide` schema + sanitizer + `designHtml` + chrome
 - [ ] 4. Locked-down renderer (JS off, network allow-list, CSP) + `lintSlide`
 - [ ] 5. `preview_slide`, design slides accepted by create/update/edit/insert with warnings
 - [x] 6. `get_design_system`, "Designing slides" section in the brand guide, `get_slide_source`

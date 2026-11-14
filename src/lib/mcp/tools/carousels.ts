@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { Slides } from '@/lib/slides';
+import { SlideInputs, type Slide } from '@/lib/slides';
+import { resolveSlideInputs } from '@/lib/layouts';
 import * as store from '@/lib/store';
 import { agentOf, carouselUrl, defineTool, fail, json } from '@/lib/mcp/define';
 
@@ -30,7 +31,7 @@ export function registerCarouselTools(server: McpServer) {
 
   defineTool(server, 'get_carousel', {
     title: 'Get carousel',
-    description: 'One carousel: slides JSON and image URLs for a version (default current), version history, requests and studio url. Each slide gets a 1-based "n" field in the output only; do not send "n" back.',
+    description: 'One carousel: slides JSON, image URLs and per-slide lint ({ errors, warnings } for design slides, null for templates) for a version (default current), version history, requests and studio url. Each slide gets a 1-based "n" field in the output only; do not send "n" back.',
     inputSchema: z.object({ id: Id, version: VersionNo.optional() }),
     scope: 'read',
     annotations: { readOnlyHint: true },
@@ -48,17 +49,18 @@ export function registerCarouselTools(server: McpServer) {
 
   defineTool(server, 'create_carousel', {
     title: 'Create carousel',
-    description: 'Creates a carousel as version 1 (status review) and renders it to 1080x1350 PNGs. Follow get_brand_guide first. Returns id, version, image URLs and studio url.',
+    description: 'Creates a carousel as version 1 (status review) and renders it to 1080x1350 PNGs. Follow get_brand_guide first. Slides may be templates, design slides you write in HTML/CSS ({ kind: "design", html, css? }) or saved layouts ({ kind: "design", layout, fill }). Design slides are sanitized and checked: off-canvas content refuses the save; other findings come back as per-slide "warnings". Returns id, version, image URLs, warnings and studio url.',
     inputSchema: z.object({
       title: z.string().min(1).describe('Internal title, e.g. "Native date input"'),
       tipNumber: z.number().int().positive().optional().describe('Series number shown on the cover label (e.g. "Tip 014"). Use the next number after the highest existing one.'),
-      slides: Slides,
+      slides: SlideInputs,
       note: z.string().optional().describe('What this version is.'),
       render: z.boolean().optional().describe('false skips rendering (faster); call render_carousel later'),
     }),
     scope: 'write',
   }, async (args, ctx) => {
-    const r = await store.createCarousel({ ...args, createdBy: agentOf(ctx) });
+    const slides = (await resolveSlideInputs(args.slides)) as Slide[];
+    const r = await store.createCarousel({ ...args, slides, createdBy: agentOf(ctx) });
     return json({ ...r, url: carouselUrl(r.id) }, { carouselId: r.id });
   });
 

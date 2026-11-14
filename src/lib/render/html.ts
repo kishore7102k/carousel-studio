@@ -1,6 +1,7 @@
 import type { BrandPack } from '@/lib/brand';
-import type { Slide } from '@/lib/slides';
-import { brandCss, codeRows, esc, foot, H, inline, W } from './brand-layer';
+import type { DesignSlide, Slide } from '@/lib/slides';
+import { brandCss, chromeHtml, codeRows, designLayerCss, esc, foot, H, inline, W } from './brand-layer';
+import { ROOT, sanitizeCss, sanitizeHtml } from './sanitize';
 
 export { W, H, inline };
 
@@ -40,6 +41,7 @@ code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:var
 `;
 
 export function slideHtml(slide: Slide, i: number, total: number, tipLabel: string, brand: BrandPack) {
+  if (slide.kind === 'design') return designHtml(slide, i, total, tipLabel, brand);
   const counter = `${i + 1} / ${total}`;
   let inner: string;
   switch (slide.kind) {
@@ -71,3 +73,40 @@ export function slideHtml(slide: Slide, i: number, total: number, tipLabel: stri
   }
   return `<!doctype html><html><head><meta charset="utf-8"><style>${css(brand)}</style></head><body>${inner}</body></html>`;
 }
+
+// ---------- design slides ----------
+
+// The slide root's box and stacking are locked: a layer declared first with !important beats any agent
+// declaration (layered !important > unlayered !important), so agent css cannot move the slide, let content
+// escape its clip, or stack above the studio chrome.
+const LOCK = `@layer studio-lock{${ROOT}{position:relative!important;inset:0!important;margin:0!important;width:${W}px!important;height:${H}px!important;overflow:hidden!important;isolation:isolate!important;contain:paint!important;z-index:0!important;transform:none!important;zoom:1!important}}`;
+
+const cssString = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/</g, '\\3c ').replace(/\n/g, '\\a ')}"`;
+
+const decode = (s: string) => s.replace(/&(lt|gt|quot|#39|apos|amp|#x[0-9a-f]+|#\d+);/gi, (m, e: string) => {
+  const k = e.toLowerCase();
+  if (k[0] === '#') return String.fromCodePoint(Math.min(k[1] === 'x' ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10), 0x10ffff) || 0xfffd);
+  return ({ lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'", amp: '&' } as Record<string, string>)[k] ?? m;
+});
+
+/** <pre class="editor [diff]">plain code</pre> → highlighted editor rows (like the code template). */
+const editorBlocks = (html: string) =>
+  html.replace(/<pre\b([^>]*?)\bclass="([^"]*\beditor\b[^"]*)"([^>]*)>([^<]*)<\/pre>/gi, (_, a: string, cls: string, b: string, code: string) =>
+    `<div${a}class="${cls}"${b}>${codeRows(decode(code).replace(/^\r?\n/, '').replace(/\r?\n$/, ''), /\bdiff\b/.test(cls))}</div>`);
+
+/**
+ * A design slide: brand layer + sanitized html inside <section class="slide design {ground}"> + css scoped to that
+ * section + the studio chrome (outside the section, so agent css cannot touch it).
+ * The section also gets --tip (the tip label) and --handle as CSS strings, e.g. ".x::before{content:var(--tip)}".
+ */
+export function designHtml(slide: DesignSlide, i: number, total: number, tipLabel: string, brand: BrandPack) {
+  const html = sanitizeHtml(slide.html);
+  const css = sanitizeCss([slide.css ?? '', ...html.styles].join('\n'), { scope: true });
+  const ground = slide.ground ?? 'paper';
+  const chrome = slide.chrome ?? 'auto';
+  const cls = `slide design ${ground}${chrome === 'none' ? '' : ' with-foot'}`;
+  const vars = `--tip:${cssString(tipLabel)};--handle:${cssString(brand.handle)}`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${LOCK}${brandCss(brand)}${designLayerCss(brand)}</style><style>${css.css}</style></head>`
+    + `<body><section class="${cls}" style="${esc(vars)}">${editorBlocks(html.html)}</section>${chromeHtml(chrome, ground, i + 1, total, brand.handle)}</body></html>`;
+}
+

@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { Slide, Slides } from '@/lib/slides';
+import { SlideInput, SlideInputs, type Slide } from '@/lib/slides';
+import { resolveSlideInputs } from '@/lib/layouts';
 import * as store from '@/lib/store';
 import { agentOf, carouselUrl, defineTool, fail, json } from '@/lib/mcp/define';
 import { Id, VersionNo } from './carousels';
@@ -21,21 +22,23 @@ const out = (id: string, r: Awaited<ReturnType<typeof store.modifySlides>>, extr
   ...(r.unchanged ? { unchanged: true } : {}),
   slideCount: r.slides.length,
   ...extra,
+  ...(r.warnings.length ? { warnings: r.warnings } : {}),
   images: r.images,
   url: carouselUrl(id),
 });
 
-const COMMON = 'Creates a NEW version from the CURRENT version (old versions are kept, status goes back to review) and renders it. Slide numbers are 1-based. Refused on trashed carousels. Pass baseVersion (the version you read) to fail with "stale" instead of editing a version someone else just replaced.';
+const COMMON = 'Creates a NEW version from the CURRENT version (old versions are kept, status goes back to review) and renders it. Slide numbers are 1-based. Refused on trashed carousels. Pass baseVersion (the version you read) to fail with "stale" instead of editing a version someone else just replaced. Design slides are sanitized and checked: off-canvas content refuses the save, other findings come back as per-slide "warnings".';
 
 export function registerSlideTools(server: McpServer) {
   defineTool(server, 'update_slides', {
     title: 'Update slides',
-    description: 'Replaces ALL slides: saves the full array as a NEW version from the current one (old versions are kept) and renders it. Send every slide, not a diff; for one-slide changes prefer edit_slide / insert_slide / remove_slide / move_slide. Pass baseVersion to fail with "stale" if someone else changed the carousel since you read it.',
-    inputSchema: z.object({ id: Id, slides: Slides, ...editOpts }),
+    description: 'Replaces ALL slides: saves the full array as a NEW version from the current one (old versions are kept) and renders it. Send every slide, not a diff; for one-slide changes prefer edit_slide / insert_slide / remove_slide / move_slide. Slides may be templates, design slides or { kind: "design", layout, fill }. Design slides are sanitized and checked: off-canvas content refuses the save, other findings come back as per-slide "warnings". Pass baseVersion to fail with "stale" if someone else changed the carousel since you read it.',
+    inputSchema: z.object({ id: Id, slides: SlideInputs, ...editOpts }),
     scope: 'write',
     carouselArg: 'id',
   }, async (args, ctx) => {
-    const r = await store.updateSlides({ ...args, createdBy: agentOf(ctx) });
+    const slides = (await resolveSlideInputs(args.slides)) as Slide[];
+    const r = await store.updateSlides({ ...args, slides, createdBy: agentOf(ctx) });
     return json({ ...r, url: carouselUrl(args.id) }, { detail: { version: r.version } });
   });
 
@@ -61,17 +64,18 @@ export function registerSlideTools(server: McpServer) {
 
   defineTool(server, 'insert_slide', {
     title: 'Insert slide',
-    description: `Inserts one new slide BEFORE position \`at\` (1-based); at = slide count + 1 appends at the end. Max 10 slides. ${COMMON}`,
+    description: `Inserts one new slide BEFORE position \`at\` (1-based); at = slide count + 1 appends at the end. Max 10 slides. The slide may be a template, a design slide or { kind: "design", layout, fill }. ${COMMON}`,
     inputSchema: z.object({
       id: Id,
       at: SlideNo.describe('1-based position the new slide will have; count+1 appends'),
-      slide: Slide,
+      slide: SlideInput,
       ...editOpts,
     }),
     scope: 'write',
     carouselArg: 'id',
   }, async (args, ctx) => {
-    const r = await store.insertSlide({ ...args, createdBy: agentOf(ctx) });
+    const [slide] = (await resolveSlideInputs([args.slide])) as Slide[];
+    const r = await store.insertSlide({ ...args, slide, createdBy: agentOf(ctx) });
     return json(out(args.id, r, { inserted: args.at }), { detail: { at: args.at, kind: args.slide.kind, version: r.version } });
   });
 
