@@ -82,7 +82,7 @@ After finishing each item, tick it here and commit code + this file together. If
 - [ ] 6. `get_design_system`, "Designing slides" section in the brand guide, `get_slide_source`
 - [ ] 7. Assets: table, `upload_asset` / `list_assets` / `delete_asset`, purge removes them
 - [ ] 8. Layouts: table + tools + `{ layout, fill }` in slide inputs
-- [ ] 9. UI: design slide editor + preview + warnings, Convert to design, Layouts page
+- [x] 9. UI: design slide editor + preview + warnings, Convert to design, Layouts page
 - [ ] 10. `scripts/design-smoke.ts` + `npm run design:smoke` passing; other smoke tests still passing
 - [ ] 11. README + brand guide docs; build + lint clean
 - [ ] 12. Manual: ask Claude.ai and ChatGPT (via the connector) to design a 6-slide carousel on a topic with no template slides; record results here

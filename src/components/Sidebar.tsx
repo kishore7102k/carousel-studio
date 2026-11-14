@@ -8,6 +8,7 @@ const I = {
   inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
   key: 'M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4',
   palette: 'M12 22a10 10 0 1 1 10-10c0 2.2-1.8 3-4 3h-2a2 2 0 0 0-1 3.7A2 2 0 0 1 12 22zM7.5 10.5h.01M10.5 6.5h.01M15.5 7.5h.01',
+  layout: 'M3 3h18v6H3zM3 13h8v8H3zM15 13h6v8h-6z',
   plus: 'M12 5v14M5 12h14',
   out: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
 };
@@ -21,6 +22,7 @@ export function Sidebar({ openRequests, brandName }: { openRequests: number; bra
     { href: '/', label: 'Carousels', icon: I.grid, active: path === '/' || path.startsWith('/c/') },
     { href: '/requests', label: 'Requests', icon: I.inbox, badge: openRequests },
     { href: '/agents', label: 'Agents', icon: I.key },
+    { href: '/layouts', label: 'Layouts', icon: I.layout },
     { href: '/brand', label: 'Brand', icon: I.palette },
   ];
   return (

@@ -2,20 +2,31 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition, type MouseEvent } from 'react';
-import type { Slide } from '@/lib/slides';
-import { addNote, deleteCarousel, dismissRequest, duplicateCarousel, rerender, saveSlides, setStatus, switchVersion } from '@/app/actions';
+import type { DesignSlide, Slide as TemplateSlide } from '@/lib/slides';
+import { addNote, convertToDesign, deleteCarousel, dismissRequest, duplicateCarousel, previewDesign, rerender, saveSlides, setStatus, switchVersion } from '@/app/actions';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { LocalTime } from '@/components/LocalTime';
 
+type Slide = TemplateSlide | DesignSlide;
+type LintItem = { errors: string[]; warnings: string[] } | null;
 type Req = { id: string; kind: string; status: string; text: string; slideIndex: number | null; x: number | null; y: number | null; versionNumber: number | null; claimedBy: string | null; reply: string | null; resultVersion: number | null };
 type Data = {
   carousel: { id: string; title: string; status: string; currentVersion: number; tipNumber: number | null };
-  version: { number: number; slides: Slide[]; images: string[]; createdBy: string; note: string | null };
+  version: { number: number; slides: Slide[]; images: string[]; lint?: LintItem[] | null; createdBy: string; note: string | null };
   versions: { number: number; createdBy: string; note: string | null; createdAt: string }[];
   requests: Req[];
 };
 
-const blank: Record<Slide['kind'], Slide> = {
+const DESIGN_STARTER: DesignSlide = {
+  kind: 'design',
+  name: 'big number',
+  html: '<div class="stat">\n  <span class="key">Tip</span>\n  <div class="num">10<span class="unit">x</span></div>\n  <h2>Faster with <span class="mark">one change</span></h2>\n  <p>Explain the number in one short line.</p>\n</div>',
+  css: '.stat { position: absolute; inset: 64px; display: flex; flex-direction: column; justify-content: center; gap: 24px; }\n.num { font-size: 360px; line-height: 1; font-weight: 700; color: var(--primary); }\n.unit { font-size: 160px; }\nh2 { font-size: 72px; line-height: 1.1; margin: 0; color: var(--ink); }\np { font-size: 36px; color: var(--ink); margin: 0; }',
+  chrome: 'auto',
+};
+
+const blank: Record<string, Slide> = {
+  design: DESIGN_STARTER,
   cover: { kind: 'cover', hook: 'New *hook*' },
   content: { kind: 'content', title: 'New *title*', points: ['Point one', 'Point two'] },
   code: { kind: 'code', file: 'example.ts', code: 'const x = 1;' },
@@ -62,7 +73,7 @@ export function CarouselView({ data, activity }: { data: Data; activity: Act[] }
     if (!editing) return;
     setError('');
     start(async () => {
-      const res = await saveSlides(carousel.id, editing, editNote);
+      const res = await saveSlides(carousel.id, editing as TemplateSlide[], editNote);
       if ('error' in res && res.error) { setError(res.error); return; }
       setEditing(null);
       setEditNote('');
@@ -125,21 +136,23 @@ export function CarouselView({ data, activity }: { data: Data; activity: Act[] }
                   )}
                 </div>
                 <div className="slide-meta">
-                  <span className="mono muted">{i + 1} · {s.kind}</span>
+                  <span className="mono muted">{i + 1} · {s.kind}{s.kind === 'design' && s.name ? ` · ${s.name}` : ''}</span>
+                  {!editing && <LintBadge lint={version.lint?.[i] ?? null} />}
                   {version.images[i] && !editing && <a href={version.images[i]} target="_blank" rel="noreferrer" className="muted">Open PNG</a>}
                 </div>
-                {editing && <SlideEditor slide={s} onChange={p => patch(i, p)} onRemove={() => setEditing(editing.filter((_, j) => j !== i))} />}
+                {editing && <SlideEditor slide={s} carouselId={carousel.id} index={i} total={slides.length} onReplace={ns => setEditing(editing.map((x, j) => (j === i ? ns : x)))} onChange={p => patch(i, p)} onRemove={() => setEditing(editing.filter((_, j) => j !== i))} />}
               </div>
             ))}
           </div>
           {editing ? (
             <div className="savebar">
-              <select aria-label="Add slide" value="" onChange={e => { const k = e.target.value as Slide['kind']; if (k) setEditing([...editing.slice(0, -1), blank[k], ...editing.slice(-1)]); }} style={{ width: 'auto' }}>
+              <select aria-label="Add slide" value="" onChange={e => { const k = e.target.value; if (k) setEditing([...editing.slice(0, -1), structuredClone(blank[k]), ...editing.slice(-1)]); }} style={{ width: 'auto' }}>
                 <option value="">+ Add slide…</option>
                 <option value="content">Content</option>
                 <option value="code">Code</option>
                 <option value="cover">Cover</option>
                 <option value="cta">CTA</option>
+                <option value="design">Design (blank)</option>
               </select>
               <input aria-label="What changed" placeholder="What changed (optional)" value={editNote} onChange={e => setEditNote(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
               <button className="btn primary" disabled={pending} onClick={save}>{pending ? 'Rendering…' : 'Save as new version'}</button>
@@ -183,7 +196,64 @@ export function CarouselView({ data, activity }: { data: Data; activity: Act[] }
   );
 }
 
-function SlideEditor({ slide, onChange, onRemove }: { slide: Slide; onChange: (p: Partial<Slide>) => void; onRemove: () => void }) {
+function LintBadge({ lint }: { lint: LintItem }) {
+  if (!lint || (lint.errors.length === 0 && lint.warnings.length === 0)) return null;
+  const n = lint.errors.length + lint.warnings.length;
+  return (
+    <details className="lint-badge">
+      <summary className={`chip ${lint.errors.length ? 'error' : ''}`} title={[...lint.errors, ...lint.warnings].join('\n')}>{n} {lint.errors.length ? 'issue' : 'warning'}{n > 1 ? 's' : ''}</summary>
+      <ul>{lint.errors.map((m, i) => <li key={`e${i}`}><b>error</b> {m}</li>)}{lint.warnings.map((m, i) => <li key={`w${i}`}>{m}</li>)}</ul>
+    </details>
+  );
+}
+
+type Preview = { dataUrl: string | null; errors: string[]; warnings: string[] };
+
+function DesignEditor({ slide, carouselId, index, total, onChange }: { slide: DesignSlide; carouselId: string; index: number; total: number; onChange: (p: Partial<DesignSlide>) => void }) {
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [busy, go] = useTransition();
+  const set = (key: 'name' | 'css' | 'chrome', value: string) => onChange({ [key]: value === '' ? undefined : value } as Partial<DesignSlide>);
+  return (
+    <div className="design-edit">
+      <div className="design-fields">
+        <div><label>Name</label><input value={slide.name ?? ''} onChange={e => set('name', e.target.value)} placeholder="e.g. big number" /></div>
+        <div>
+          <label>Chrome</label>
+          <select value={slide.chrome ?? 'auto'} onChange={e => set('chrome', e.target.value)}>
+            <option value="auto">auto (handle + counter)</option>
+            <option value="handle">handle</option>
+            <option value="counter">counter</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+        <div><label>HTML</label><textarea rows={10} className="code" spellCheck={false} value={slide.html} onChange={e => onChange({ html: e.target.value })} /></div>
+        <div><label>CSS</label><textarea rows={8} className="code" spellCheck={false} value={slide.css ?? ''} onChange={e => set('css', e.target.value)} /></div>
+        <button className="btn sm primary" disabled={busy} onClick={() => go(async () => setPreview(await previewDesign(carouselId, slide, index + 1, total)))}>{busy ? 'Rendering…' : 'Preview'}</button>
+      </div>
+      {preview && (
+        <div className="design-preview">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {preview.dataUrl && <img src={preview.dataUrl} alt="Design preview" />}
+          {preview.errors.length > 0 && <ul className="error" role="alert">{preview.errors.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+          {preview.warnings.length > 0 && <ul className="muted">{preview.warnings.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+          {preview.dataUrl && preview.errors.length === 0 && preview.warnings.length === 0 && <p className="muted">No issues.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SlideEditor({ slide, carouselId, index, total, onReplace, onChange, onRemove }: { slide: Slide; carouselId: string; index: number; total: number; onReplace: (s: Slide) => void; onChange: (p: Partial<Slide>) => void; onRemove: () => void }) {
+  const [convErr, setConvErr] = useState('');
+  const [converting, conv] = useTransition();
+  if (slide.kind === 'design') {
+    return (
+      <div className="editor">
+        <DesignEditor slide={slide} carouselId={carouselId} index={index} total={total} onChange={p => onChange(p as Partial<Slide>)} />
+        <button className="btn sm danger" onClick={onRemove}>Remove slide</button>
+      </div>
+    );
+  }
   const field = (key: string, label: string, value: string | undefined, rows = 2, code = false) => (
     <div>
       <label>{label}</label>
@@ -213,7 +283,14 @@ function SlideEditor({ slide, onChange, onRemove }: { slide: Slide; onChange: (p
         </label>
         {field('caption', 'Caption', slide.caption)}
       </>}
-      <button className="btn sm danger" onClick={onRemove}>Remove slide</button>
+      <span className="row">
+        <button className="btn sm" disabled={converting} onClick={() => conv(async () => {
+          const r = await convertToDesign(carouselId, slide, index, total);
+          if ('error' in r) setConvErr(r.error); else onReplace(r.slide);
+        })}>{converting ? 'Converting…' : 'Convert to design'}</button>
+        <button className="btn sm danger" onClick={onRemove}>Remove slide</button>
+      </span>
+      {convErr && <p className="error" role="alert">{convErr}</p>}
     </div>
   );
 }

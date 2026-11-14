@@ -5,6 +5,10 @@ import { SESSION_COOKIE } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Slides, starterSlides, type Slide } from '@/lib/slides';
 import * as store from '@/lib/store';
+import { getBrand, tipLabel } from '@/lib/brand';
+import { previewSlide, templateToDesign } from '@/lib/render/design';
+import { deleteLayout } from '@/lib/layouts';
+import type { DesignSlide } from '@/lib/slides';
 
 const HUMAN = 'you';
 const log = (action: string, carouselId?: string | null, detail?: Record<string, unknown>) => store.logActivity(HUMAN, action, carouselId, detail);
@@ -99,4 +103,33 @@ export async function duplicateCarousel(carouselId: string, version?: number) {
   await log('duplicate_carousel', res.id, { from: carouselId });
   revalidatePath('/');
   redirect(`/c/${res.id}`);
+}
+
+type EditorSlide = Slide | DesignSlide;
+
+/** Renders one slide in the locked-down browser without saving; returns a PNG data URL plus lint results. */
+export async function previewDesign(carouselId: string, slide: EditorSlide, n: number, total: number) {
+  try {
+    const [brand, got] = await Promise.all([getBrand(), store.getCarousel(carouselId)]);
+    const res = await previewSlide(slide, { n, total, tipLabel: tipLabel(brand, got?.carousel.tipNumber ?? null), brand });
+    return { dataUrl: `data:image/png;base64,${Buffer.from(res.png).toString('base64')}`, errors: res.errors, warnings: res.warnings };
+  } catch (e) {
+    return { dataUrl: null, errors: [e instanceof Error ? e.message : String(e)], warnings: [] as string[] };
+  }
+}
+
+/** Converts a template slide into an editable design slide that renders the same. */
+export async function convertToDesign(carouselId: string, slide: Slide, i: number, total: number): Promise<{ slide: DesignSlide } | { error: string }> {
+  try {
+    const [brand, got] = await Promise.all([getBrand(), store.getCarousel(carouselId)]);
+    return { slide: templateToDesign(slide, i, total, tipLabel(brand, got?.carousel.tipNumber ?? null), brand) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function removeLayout(name: string) {
+  await deleteLayout(name);
+  await log('delete_layout', null, { name });
+  revalidatePath('/layouts');
 }
