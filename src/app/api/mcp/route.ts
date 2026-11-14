@@ -118,7 +118,7 @@ const handler = createMcpHandler(server => {
 
 const authed = withMcpAuth(handler, async (_req, token) => {
   const agent = await verifyApiKey(token);
-  return agent ? { token: token!, clientId: agent, scopes: ['studio'] } : undefined;
+  return agent ? { token: token!, clientId: agent.name, scopes: agent.scopes, extra: { keyId: agent.id } } : undefined;
 }, { required: true });
 
 export { authed as GET, authed as POST, authed as DELETE };

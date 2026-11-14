@@ -129,7 +129,7 @@ OAuth / ChatGPT, Claude.ai, Gemini web sign-in (phase 2), REST/OpenAPI (phase 4)
 Work through these in order. **After finishing each item, tick it here and commit** (code + this file together), so another agent can resume exactly where you stopped. If you stop mid-item, add a one-line note under it saying what is done and what is left.
 
 - [x] 1. Schema: `api_keys.scopes`, `carousels.deleted_at`, `activity` table; `npm run db:push`
-- [ ] 2. Auth: `verifyApiKey` returns scopes; MCP verifier passes them through
+- [x] 2. Auth: `verifyApiKey` returns scopes; MCP verifier passes them through
 - [ ] 3. `src/lib/mcp/server.ts` + `defineTool` helper (scope check, errors, activity log); route.ts made thin
 - [ ] 4. Move the 11 existing tools into `src/lib/mcp/tools/*` via `defineTool` (behavior unchanged + new params)
 - [ ] 5. Carousel tools: update, duplicate, delete/restore/purge, set_current_version, compare_versions

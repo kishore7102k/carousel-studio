@@ -6,14 +6,16 @@ const hex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf), b => b.toStrin
 
 export const sha256 = async (s: string) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
 
-/** Agent API keys: stored as sha256 hashes. Returns the agent name or null. */
+export type ApiKeyScopes = ('read' | 'write' | 'admin')[];
+
+/** Agent API keys: stored as sha256 hashes. Returns the agent identity or null. */
 export async function verifyApiKey(token: string | undefined) {
   if (!token?.startsWith('ks_')) return null;
   const db = getDb();
   const [k] = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.hash, await sha256(token)));
   if (!k) return null;
   await db.update(schema.apiKeys).set({ lastUsedAt: new Date() }).where(eq(schema.apiKeys.id, k.id));
-  return k.name;
+  return { id: k.id, name: k.name, scopes: (k.scopes ?? ['read', 'write']) as ApiKeyScopes };
 }
 
 export function newApiKey() {
