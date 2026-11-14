@@ -132,7 +132,7 @@ Work through these in order. **After finishing each item, tick it here and commi
 - [x] 2. Auth: `verifyApiKey` returns scopes; MCP verifier passes them through
 - [x] 3. `src/lib/mcp/server.ts` + `defineTool` helper (scope check, errors, activity log); route.ts made thin
 - [x] 4. Move the 11 existing tools into `src/lib/mcp/tools/*` via `defineTool` (behavior unchanged + new params)
-- [ ] 5. Carousel tools: update, duplicate, delete/restore/purge, set_current_version, compare_versions
+- [x] 5. Carousel tools: update, duplicate, delete/restore/purge, set_current_version, compare_versions
 - [ ] 6. Slide tools: edit_slide, insert_slide, remove_slide, move_slide, `baseVersion` on update_slides
 - [ ] 7. Render tools: view_slides URLs, get_download_links
 - [ ] 8. Request tools: get_request, add_note, request_carousel, dismiss_request, reopen_request

@@ -1,4 +1,5 @@
-import { and, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { del, list } from '@vercel/blob';
 import { getDb, schema } from '@/db';
 import { renderAndUpload } from '@/lib/render/render';
 import { Slides, type Slide } from '@/lib/slides';
@@ -88,16 +89,95 @@ export async function updateCarousel(id: string, patch: { status?: Status; title
   return c ?? null;
 }
 
-/** Soft delete: sets deleted_at. Use purgeCarousel for a hard delete. */
+/** Soft delete (moves to trash). Idempotent: an already-trashed carousel keeps its original deleted_at. */
 export async function deleteCarousel(id: string) {
-  const [c] = await getDb().update(carousels).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(carousels.id, id)).returning();
+  const [c] = await getDb().update(carousels).set({ deletedAt: sql`coalesce(${carousels.deletedAt}, now())`, updatedAt: new Date() })
+    .where(eq(carousels.id, id)).returning();
   return c ?? null;
 }
 
-/** Clears soft delete. */
+/** Takes a carousel out of the trash. */
 export async function restoreCarousel(id: string) {
   const [c] = await getDb().update(carousels).set({ deletedAt: null, updatedAt: new Date() }).where(eq(carousels.id, id)).returning();
   return c ?? null;
+}
+
+/** Permanent delete, only from the trash (one atomic DELETE ... WHERE deleted_at IS NOT NULL). Also removes its Blob images. */
+export async function purgeCarousel(id: string) {
+  const db = getDb();
+  const [gone] = await db.delete(carousels).where(and(eq(carousels.id, id), isNotNull(carousels.deletedAt)))
+    .returning({ id: carousels.id, title: carousels.title });
+  if (!gone) {
+    const [c] = await db.select({ id: carousels.id }).from(carousels).where(eq(carousels.id, id));
+    throw new Error(c ? 'carousel is not in the trash; delete_carousel it first' : `carousel ${id} not found`);
+  }
+  let blobsDeleted = 0;
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix: `carousels/${id}/`, cursor, limit: 1000 });
+      if (page.blobs.length) await del(page.blobs.map(b => b.url));
+      blobsDeleted += page.blobs.length;
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+  }
+  return { id, title: gone.title, purged: true, blobsDeleted };
+}
+
+/** Copies one version (default current) of a carousel into a NEW carousel as v1. */
+export async function duplicateCarousel(input: { id: string; version?: number; title?: string; createdBy: string; render?: boolean }) {
+  const got = await getCarousel(input.id, input.version);
+  if (!got) throw new Error(`carousel ${input.id} not found`);
+  if (!got.version) throw new Error(`version ${input.version} not found`);
+  return createCarousel({
+    title: input.title?.trim() || `${got.carousel.title} (copy)`,
+    tipNumber: got.carousel.tipNumber,
+    slides: got.version.slides,
+    createdBy: input.createdBy,
+    note: `Copied from "${got.carousel.title}" v${got.version.number}`,
+    render: input.render,
+  });
+}
+
+/** Points the carousel at an existing version (atomic: no-op if that version does not exist). */
+export async function setCurrentVersion(id: string, version: number) {
+  const db = getDb();
+  const [c] = await db.update(carousels).set({ currentVersion: version, updatedAt: new Date() })
+    .where(and(eq(carousels.id, id), sql`exists (select 1 from ${versions} where ${versions.carouselId} = ${id} and ${versions.number} = ${version})`))
+    .returning();
+  if (c) return c;
+  const [exists] = await db.select({ id: carousels.id }).from(carousels).where(eq(carousels.id, id));
+  throw new Error(exists ? `version ${version} not found` : `carousel ${id} not found`);
+}
+
+export type SlideChange =
+  | { slide: number; change: 'added' | 'removed'; kind: string }
+  | { slide: number; change: 'changed'; fields: Record<string, { from: unknown; to: unknown }> };
+
+/** Position-by-position diff of two slide arrays. Slide numbers are 1-based. */
+export function diffSlides(a: Slide[], b: Slide[]): SlideChange[] {
+  const out: SlideChange[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] as Record<string, unknown> | undefined;
+    const y = b[i] as Record<string, unknown> | undefined;
+    if (!x) { out.push({ slide: i + 1, change: 'added', kind: String(y!.kind) }); continue; }
+    if (!y) { out.push({ slide: i + 1, change: 'removed', kind: String(x.kind) }); continue; }
+    const fields: Record<string, { from: unknown; to: unknown }> = {};
+    for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+      if (JSON.stringify(x[k]) !== JSON.stringify(y[k])) fields[k] = { from: x[k] ?? null, to: y[k] ?? null };
+    }
+    if (Object.keys(fields).length) out.push({ slide: i + 1, change: 'changed', fields });
+  }
+  return out;
+}
+
+export async function compareVersions(id: string, a: number, b: number) {
+  const vs = await getDb().select({ number: versions.number, slides: versions.slides }).from(versions)
+    .where(and(eq(versions.carouselId, id), inArray(versions.number, [a, b])));
+  const va = vs.find(v => v.number === a);
+  const vb = vs.find(v => v.number === b);
+  if (!va || !vb) throw new Error(`version ${!va ? a : b} not found for carousel ${id}`);
+  return { id, a, b, slideCount: { a: va.slides.length, b: vb.slides.length }, changes: diffSlides(va.slides, vb.slides) };
 }
 
 // ---------- requests (the queue agents work from) ----------
@@ -135,6 +215,26 @@ export async function completeRequest(id: string, agent: string, reply: string, 
 
 export async function setRequestStatus(id: string, status: RequestStatus) {
   await getDb().update(requests).set({ status, updatedAt: new Date() }).where(eq(requests.id, id));
+}
+
+export async function getRequest(id: string) {
+  const [r] = await getDb().select().from(requests).where(eq(requests.id, id));
+  return r ?? null;
+}
+
+/** Atomic open/claimed -> dismissed. Returns { row, changed }; row null if the id is unknown. */
+export async function dismissRequest(id: string) {
+  const [r] = await getDb().update(requests).set({ status: 'dismissed', updatedAt: new Date() })
+    .where(and(eq(requests.id, id), inArray(requests.status, ['open', 'claimed']))).returning();
+  return r ? { row: r, changed: true } : { row: await getRequest(id), changed: false };
+}
+
+/** Atomic done/dismissed -> open, clearing claim and result fields. */
+export async function reopenRequest(id: string) {
+  const [r] = await getDb().update(requests)
+    .set({ status: 'open', claimedBy: null, claimedAt: null, reply: null, resultVersion: null, updatedAt: new Date() })
+    .where(and(eq(requests.id, id), inArray(requests.status, ['done', 'dismissed']))).returning();
+  return r ? { row: r, changed: true } : { row: await getRequest(id), changed: false };
 }
 
 // ---------- activity log ----------
