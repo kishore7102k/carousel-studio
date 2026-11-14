@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { createKey, revokeKey as revoke, normalizeScopes, type Scope } from '@/lib/auth';
 import { logActivity } from '@/lib/store';
+import { disconnectClient } from '@/lib/oauth/connections';
 
 export async function createKeyAction(_prev: unknown, formData: FormData) {
   const name = String(formData.get('name') || '').trim().slice(0, 60);
@@ -17,5 +18,11 @@ export async function createKeyAction(_prev: unknown, formData: FormData) {
 export async function revokeKey(id: string) {
   await revoke(id);
   await logActivity('you', 'revoke_access', null, { id });
+  revalidatePath('/agents');
+}
+
+export async function disconnectApp(id: string) {
+  const tokens = await disconnectClient(id);
+  await logActivity('you', 'revoke_access', null, { appId: id, tokensRevoked: tokens });
   revalidatePath('/agents');
 }
