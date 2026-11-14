@@ -84,6 +84,7 @@ export async function applyLayout(ref: LayoutRef): Promise<DesignSlide> {
     html: fillHtml(layout.html, fill),
     ...(layout.css ? { css: layout.css } : {}),
     ...(ref.chrome ? { chrome: ref.chrome } : {}),
+    ...(ref.ground ? { ground: ref.ground } : {}),
     name: layout.name,
   };
 }

@@ -30,16 +30,13 @@ export async function brandGuideText() {
 const EXAMPLES = `## Example design slides (complete; pass as the slide object)
 
 Big number:
-{"kind":"design","name":"big number","html":"<span class=\"key\">Tip 014</span><div class=\"num\">73%</div><h2 class=\"t-title\">of the bundle was <mark>one</mark> import</h2><p class=\"t-body muted\">Check yours with a bundle analyzer.</p>","css":".num{font-size:320px;line-height:1;font-weight:700;color:var(--primary);letter-spacing:-8px;margin:48px 0 24px}"}
+{"kind":"design","name":"big number","html":"<span class=\\"key\\">Tip 014</span><div class=\\"num\\">73%</div><h2 class=\\"t-title\\">of the bundle was <mark>one</mark> import</h2><p class=\\"t-body muted\\">Check yours with a bundle analyzer.</p>","css":".num{font-size:320px;line-height:1;font-weight:700;color:var(--primary);letter-spacing:-8px;margin:48px 0 24px}"}
 
 Side-by-side comparison:
-{"kind":"design","name":"comparison","html":"<h2 class=\"t-title\">Before vs <mark>after</mark></h2><div class=\"cols\"><div class=\"card\"><span class=\"chip\">Before</span><p class=\"t-body\">Fetch in useEffect, manual loading state</p></div><div class=\"card primary\"><span class=\"chip\">After</span><p class=\"t-body\">Server component, no client JS</p></div></div>","css":".cols{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:64px;flex:1}.cols .card{display:flex;flex-direction:column;gap:32px;padding:40px}"}
+{"kind":"design","name":"comparison","html":"<h2 class=\\"t-title\\">Before vs <mark>after</mark></h2><div class=\\"cols\\"><div class=\\"card\\"><span class=\\"chip\\">Before</span><p class=\\"t-body\\">Fetch in useEffect, manual loading state</p></div><div class=\\"card primary\\"><span class=\\"chip\\">After</span><p class=\\"t-body\\">Server component, no client JS</p></div></div>","css":".cols{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:64px;flex:1}.cols .card{display:flex;flex-direction:column;gap:32px;padding:40px}"}
 
 Annotated code:
-{"kind":"design","name":"annotated code","html":"<h2 class=\"t-title\">Why this is <mark>safe</mark></h2><pre class=\"editor\">// 1. validate first
-const data = schema.parse(input)
-// 2. then use it
-save(data)</pre><p class=\"t-caption\">Parse, do not trust.</p>","css":"&{gap:48px}"}`;
+{"kind":"design","name":"annotated code","html":"<h2 class=\\"t-title\\">Why this is <mark>safe</mark></h2><pre class=\\"editor\\">// 1. validate first\\nconst data = schema.parse(input)\\n// 2. then use it\\nsave(data)</pre><p class=\\"t-caption\\">Parse, do not trust.</p>","css":"&{gap:48px}"}`;
 
 /** "Designing slides" guide section. Variables and classes come from designSystem() so it stays in sync with the brand. */
 export async function designingGuideText() {
