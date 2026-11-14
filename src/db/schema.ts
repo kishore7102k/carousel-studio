@@ -82,6 +82,8 @@ export const oauthClients = pgTable('oauth_clients', {
   clientUri: text('client_uri'),
   source: text('source', { enum: ['dcr', 'cimd'] }).notNull(),
   metadataFetchedAt: timestamp('metadata_fetched_at', { withTimezone: true }),
+  /** DCR only: requester IP, for the 20-registrations-per-hour limit. */
+  registeredIp: text('registered_ip'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 });
