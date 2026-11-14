@@ -38,4 +38,26 @@ export function registerRenderTools(server: McpServer) {
     const text = `Version ${got.version.number}, slides ${pick.map(s => s.n).join(', ')}\n\nImage URLs:\n${pick.map(s => `${s.n}. ${s.url}`).join('\n')}`;
     return { content: [{ type: 'text', text }, ...images] };
   });
+
+  defineTool(server, 'get_download_links', {
+    title: 'Get download links',
+    description: 'Public PNG URLs (1080x1350) of a version (default current) in slide order, with file names 01.png, 02.png… to save them under. Use it to hand the final images to a publishing step or the user. Fails if the version is not rendered; call render_carousel first.',
+    inputSchema: z.object({ id: Id, version: VersionNo.optional() }),
+    scope: 'read',
+    annotations: { readOnlyHint: true },
+  }, async ({ id, version }) => {
+    const got = await store.getCarousel(id, version);
+    if (!got) return fail(`carousel ${id} not found`);
+    if (!got.version) return fail(`version ${version} not found`);
+    const { number, images, slides } = got.version;
+    if (!images.length) return fail(`version ${number} is not rendered; call render_carousel first`);
+    return json({
+      id,
+      title: got.carousel.title,
+      version: number,
+      ...(images.length !== slides.length ? { warning: `images (${images.length}) do not match slides (${slides.length}); call render_carousel` } : {}),
+      files: images.map((url, i) => ({ n: i + 1, name: `${String(i + 1).padStart(2, '0')}.png`, url })),
+      url: carouselUrl(id),
+    });
+  });
 }

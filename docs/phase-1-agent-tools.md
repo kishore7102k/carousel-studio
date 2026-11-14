@@ -134,7 +134,7 @@ Work through these in order. **After finishing each item, tick it here and commi
 - [x] 4. Move the 11 existing tools into `src/lib/mcp/tools/*` via `defineTool` (behavior unchanged + new params)
 - [x] 5. Carousel tools: update, duplicate, delete/restore/purge, set_current_version, compare_versions
 - [x] 6. Slide tools: edit_slide, insert_slide, remove_slide, move_slide, `baseVersion` on update_slides
-- [ ] 7. Render tools: view_slides URLs, get_download_links
+- [x] 7. Render tools: view_slides URLs, get_download_links
 - [x] 8. Request tools: get_request, add_note, request_carousel, dismiss_request, reopen_request
 - [x] 9. Brand tools: get_brand, update_brand, import_brand, reset_brand
 - [x] 10. Access + activity tools: list_connections, create_key, revoke_access, list_activity
