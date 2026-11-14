@@ -116,7 +116,7 @@ After finishing each item, tick it here and commit code + this file together. If
 - [x] 3. Discovery: protected resource + authorization server metadata routes (+ CORS); MCP 401 challenge via `resourceMetadataPath`
 - [x] 4. DCR `/oauth/register` with validation + rate limit + lazy cleanup
 - [ ] 5. CIMD fetcher with SSRF guard + cache
-- [ ] 6. `/oauth/authorize` page + consent UI + signed-params check + `iss` in all responses; login `next` supports it
+- [x] 6. `/oauth/authorize` page + consent UI + signed-params check + `iss` in all responses; login `next` supports it
 - [ ] 7. `/oauth/token` (code + refresh, rotation, reuse detection) and `/oauth/revoke`
 - [ ] 8. MCP verifier accepts `sat_` tokens with audience check; activity actor = client name
 - [x] 9. Proxy bypass for public OAuth routes
