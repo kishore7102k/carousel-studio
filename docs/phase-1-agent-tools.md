@@ -130,7 +130,7 @@ Work through these in order. **After finishing each item, tick it here and commi
 
 - [x] 1. Schema: `api_keys.scopes`, `carousels.deleted_at`, `activity` table; `npm run db:push`
 - [x] 2. Auth: `verifyApiKey` returns scopes; MCP verifier passes them through
-- [ ] 3. `src/lib/mcp/server.ts` + `defineTool` helper (scope check, errors, activity log); route.ts made thin
+- [x] 3. `src/lib/mcp/server.ts` + `defineTool` helper (scope check, errors, activity log); route.ts made thin
 - [ ] 4. Move the 11 existing tools into `src/lib/mcp/tools/*` via `defineTool` (behavior unchanged + new params)
 - [ ] 5. Carousel tools: update, duplicate, delete/restore/purge, set_current_version, compare_versions
 - [ ] 6. Slide tools: edit_slide, insert_slide, remove_slide, move_slide, `baseVersion` on update_slides

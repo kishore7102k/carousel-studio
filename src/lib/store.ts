@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import { renderAndUpload } from '@/lib/render/render';
 import { Slides, type Slide } from '@/lib/slides';
@@ -10,9 +10,15 @@ export type RequestStatus = (typeof requests.$inferSelect)['status'];
 
 const LEASE_MINUTES = 30;
 
-export async function listCarousels(status?: Status) {
+export async function listCarousels(filter: { status?: Status; query?: string; includeTrashed?: boolean; limit?: number } = {}) {
   const db = getDb();
-  const rows = await db.select().from(carousels).where(status ? eq(carousels.status, status) : undefined).orderBy(desc(carousels.updatedAt));
+  const { status, query, includeTrashed = false, limit = 50 } = filter;
+  const where = and(
+    status ? eq(carousels.status, status) : undefined,
+    query ? ilike(carousels.title, `%${query}%`) : undefined,
+    !includeTrashed ? isNull(carousels.deletedAt) : undefined,
+  );
+  const rows = await db.select().from(carousels).where(where).orderBy(desc(carousels.updatedAt)).limit(limit);
   if (!rows.length) return [];
   const vs = await db.select({ carouselId: versions.carouselId, number: versions.number, images: versions.images }).from(versions)
     .where(inArray(versions.carouselId, rows.map(r => r.id)));
@@ -53,12 +59,15 @@ export async function createCarousel(input: { title: string; tipNumber?: number 
   return { id: c.id, version: 1, images };
 }
 
-/** Saves slides as a NEW version (old versions are kept) and renders it. */
-export async function updateSlides(input: { id: string; slides: Slide[]; createdBy: string; note?: string; render?: boolean }) {
+/** Saves slides as a NEW version (old versions are kept) and renders it. Throws "stale" if baseVersion is given and doesn't match. */
+export async function updateSlides(input: { id: string; slides: Slide[]; createdBy: string; note?: string; render?: boolean; baseVersion?: number }) {
   const slides = Slides.parse(input.slides);
   const db = getDb();
   const [c] = await db.select().from(carousels).where(eq(carousels.id, input.id));
   if (!c) throw new Error(`carousel ${input.id} not found`);
+  if (input.baseVersion != null && c.currentVersion !== input.baseVersion) {
+    throw new Error(`stale: current version is ${c.currentVersion}`);
+  }
   const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${versions.number}), 0)::int` }).from(versions).where(eq(versions.carouselId, c.id));
   const number = max + 1;
   await db.insert(versions).values({ carouselId: c.id, number, slides, createdBy: input.createdBy, note: input.note ?? null });
@@ -79,8 +88,16 @@ export async function updateCarousel(id: string, patch: { status?: Status; title
   return c ?? null;
 }
 
+/** Soft delete: sets deleted_at. Use purgeCarousel for a hard delete. */
 export async function deleteCarousel(id: string) {
-  await getDb().delete(carousels).where(eq(carousels.id, id));
+  const [c] = await getDb().update(carousels).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(carousels.id, id)).returning();
+  return c ?? null;
+}
+
+/** Clears soft delete. */
+export async function restoreCarousel(id: string) {
+  const [c] = await getDb().update(carousels).set({ deletedAt: null, updatedAt: new Date() }).where(eq(carousels.id, id)).returning();
+  return c ?? null;
 }
 
 // ---------- requests (the queue agents work from) ----------
