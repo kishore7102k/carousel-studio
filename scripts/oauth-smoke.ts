@@ -334,7 +334,7 @@ async function main() {
 
     // ================= 4. CIMD + SSRF =================
     {
-      const cimdId = `${BASE}/api/dev/cimd-test?redirect=${encodeURIComponent(REDIRECT)}`;
+      const cimdId = `${BASE}/api/dev/cimd-test?${new URLSearchParams({ redirect: REDIRECT })}`;
       clientIds.add(cimdId);
       const { verifier, challenge } = pkce();
       const a = await authorize({ clientId: cimdId, challenge, scope: 'read write' });

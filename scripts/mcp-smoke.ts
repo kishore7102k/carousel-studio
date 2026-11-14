@@ -296,7 +296,7 @@ async function main() {
 
     // ---- access + activity ----
     const lcn = await call(A, 'list_connections');
-    const mine = lcn.data?.find?.((k: any) => k.id === admin.id);
+    const mine = lcn.data?.apiKeys?.find?.((k: any) => k.id === admin.id);
     check('list_connections (no hashes, current flagged)', lcn.ok && !!mine && mine.current === true && !/hash/i.test(lcn.text), lcn.text.slice(0, 200));
     const ck = await call(A, 'create_key', { name: `smoke-made-${RUN}`, scopes: ['read'] });
     if (ck.data?.id) { keyIds.push(ck.data.id); keyNames.push(ck.data.name); }
