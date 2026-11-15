@@ -108,23 +108,32 @@ export function defineTool<S extends z.ZodType>(
     // The SDK infers args from the schema; our handler signature is the same shape.
     (async (args: z.infer<S>, rawCtx: unknown) => {
       const ctx = rawCtx as McpCtx;
-      if (!hasScope(scopesOf(ctx), scope)) return fail(`missing scope: ${scope}`);
+      const a = (args ?? {}) as Record<string, unknown>;
+      const where = {
+        source: 'mcp' as const, tool: name, actor: agentOf(ctx), detail: compactDetail(a),
+        carouselId: typeof a.id === 'string' ? a.id : typeof a.carouselId === 'string' ? a.carouselId : null,
+      };
+      if (!hasScope(scopesOf(ctx), scope)) {
+        await logError({ ...where, error: `missing scope: ${scope}`, expected: true });
+        return fail(`missing scope: ${scope}`);
+      }
 
       let result: ToolResult;
       try {
         result = await handler(args, ctx);
       } catch (err) {
-        const a = (args ?? {}) as Record<string, unknown>;
-        await logError({
-          source: 'mcp', error: err, tool: name, actor: agentOf(ctx), detail: compactDetail(a),
-          carouselId: typeof a.id === 'string' ? a.id : typeof a.carouselId === 'string' ? a.carouselId : null,
-        });
+        // thrown: classified (caller mistake vs unexpected) by the message
+        await logError({ ...where, error: err });
         return fail(err instanceof Error ? err.message : String(err));
       }
 
       const { activity, ...out } = result;
+      if (out.isError) {
+        // returned via fail(): the tool reported a caller mistake on purpose (not found, held by another agent…)
+        const msg = out.content.find(c => c.type === 'text');
+        await logError({ ...where, error: msg && 'text' in msg ? msg.text : 'tool returned an error', expected: true });
+      }
       if (scope !== 'read' && !out.isError) {
-        const a = (args ?? {}) as Record<string, unknown>;
         const fromArgs = carouselArg && typeof a[carouselArg] === 'string' ? (a[carouselArg] as string) : null;
         await logActivity(
           agentOf(ctx),
