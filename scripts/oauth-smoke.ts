@@ -17,9 +17,10 @@ const ENDPOINT = `${BASE}/api/mcp`;
 const RUN = Math.random().toString(36).slice(2, 8);
 const PASSWORD = process.env.STUDIO_PASSWORD ?? '';
 
-type Row = { name: string; ok: boolean; detail: string };
+type Row = { name: string; ok: boolean; detail: string; skip?: boolean };
 const rows: Row[] = [];
 const check = (name: string, ok: boolean, detail = '') => { rows.push({ name, ok, detail: ok ? '' : detail }); };
+const skip = (name: string, reason: string) => { rows.push({ name, ok: true, detail: reason, skip: true }); };
 
 // ---------- helpers ----------
 
@@ -336,6 +337,12 @@ async function main() {
     {
       const cimdId = `${BASE}/api/dev/cimd-test?${new URLSearchParams({ redirect: REDIRECT })}`;
       clientIds.add(cimdId);
+      // The CIMD metadata document is served by a dev-only route (404 in production by design): skip the success path there.
+      const probe = await fetch(cimdId).then(r => r.status).catch(() => 0);
+      if (probe === 404) {
+        skip('CIMD: authorize with metadata-URL client_id issues a code', '/api/dev/cimd-test returns 404 (dev-only route, production)');
+        skip('CIMD: token exchange + MCP call', '/api/dev/cimd-test returns 404 (dev-only route, production)');
+      } else {
       const { verifier, challenge } = pkce();
       const a = await authorize({ clientId: cimdId, challenge, scope: 'read write' });
       const code = a.kind === 'callback' ? a.params.get('code') : null;
@@ -345,6 +352,7 @@ async function main() {
         const r = await mcp(tok.body?.access_token ?? '', 'list_carousels', { limit: 1 });
         check('CIMD: token exchange + MCP call', tok.status === 200 && r.ok, `${tok.status} ${mask(tok.body).slice(0, 120)}; mcp ${r.status}`);
       } else check('CIMD: token exchange + MCP call', false, 'no code');
+      }
     }
     for (const bad of ['https://127.0.0.1/x', 'http://example.com/x']) {
       const a = await authorize({ clientId: bad, challenge: pkce().challenge, expect: 'quick' });
@@ -378,9 +386,10 @@ async function main() {
   }
 
   const w = Math.max(...rows.map(r => r.name.length));
-  for (const r of rows) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.name.padEnd(w)}${r.ok ? '' : `  ${r.detail.replace(/\s+/g, ' ').slice(0, 220)}`}`);
+  for (const r of rows) console.log(`${r.skip ? 'SKIP' : r.ok ? 'PASS' : 'FAIL'}  ${r.name.padEnd(w)}${r.skip ? `  ${r.detail}` : r.ok ? '' : `  ${r.detail.replace(/\s+/g, ' ').slice(0, 220)}`}`);
   const failed = rows.filter(r => !r.ok).length;
-  console.log(`\n${rows.length - failed}/${rows.length} passed${failed ? `, ${failed} FAILED` : ''}  (${BASE})`);
+  const skipped = rows.filter(r => r.skip).length;
+  console.log(`\n${rows.length - failed}/${rows.length} passed${skipped ? ` (${skipped} skipped)` : ''}${failed ? `, ${failed} FAILED` : ''}  (${BASE})`);
   process.exit(failed ? 1 : 0);
 }
 
