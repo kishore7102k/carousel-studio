@@ -96,6 +96,8 @@ Conventions for ALL tools:
 | `search` | read | readOnly | OpenAI-compatible: `{ query }` → `{ results: [{ id, title, url }] }` over carousel titles + slide text and request text. IDs: `carousel:<uuid>` / `request:<uuid>`. |
 | `fetch` | read | readOnly | OpenAI-compatible: `{ id }` → `{ id, title, text, url, metadata }`; text = readable slide dump or request text. |
 
+> Later additions (not part of this phase's table): `set_carousel_status` is kept as a deprecated alias of `update_carousel`; Phase 3 added `preview_slide`, `get_design_system`, `get_slide_source`, `upload_asset` / `list_assets` / `delete_asset` and `save_layout` / `list_layouts` / `get_layout` / `delete_layout` (see `docs/phase-3-agent-designed-slides.md` and the README tools table). Template slide kinds were later removed: new slides are design slides only.
+
 Also register:
 - **Resource** `studio://brand-guide` (text/markdown) = same text as `get_brand_guide`.
 - **Prompts** `make_carousel { topic }` (instructions to create a 5-8 slide carousel following the brand guide) and `handle_requests` (claim → fix → complete loop).

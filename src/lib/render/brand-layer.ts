@@ -248,7 +248,7 @@ export const CLASSES: { name: string; example: string; use: string }[] = [
   { name: 'pre.editor (+ .diff)', example: '<pre class="editor diff">- old()\n+ next()</pre>', use: 'Code card; plain text inside is syntax-highlighted by the studio. With .diff, lines starting "- " / "+ " become removed / added rows' },
   { name: '.editor .r .k .s .tg .c .rm .add', example: '<div class="editor"><span class="r"><span class="k">const</span> a = <span class="s">1</span></span></div>', use: 'Hand-built code card: .r = one row, .k keyword, .s string, .tg tag, .c comment, .rm / .add diff rows' },
   { name: '.card', example: '<div class="card">…</div>', use: 'Raised panel with hairline border and 32px radius (adapts on .primary / .dark)' },
-  { name: '.rows', example: '<ul class="rows"><li>Point</li><li>Point</li></ul>', use: 'List with hairline dividers between rows (the content template list)' },
+  { name: '.rows', example: '<ul class="rows"><li>Point</li><li>Point</li></ul>', use: 'List with hairline dividers between rows' },
   { name: '.rule', example: '<hr class="rule">', use: 'Hairline divider' },
   { name: '.muted', example: '<p class="muted">Source: MDN</p>', use: 'Secondary text' },
   { name: '.mono', example: '<span class="mono">npm i</span>', use: 'Mono font (code and labels only)' },
