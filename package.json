@@ -13,7 +13,8 @@
     "brand:import": "dotenv -e .env.local -- tsx scripts/import-brand.ts",
     "mcp:smoke": "dotenv -e .env.local -- tsx scripts/mcp-smoke.ts",
     "design:smoke": "dotenv -e .env.local -- tsx scripts/design-smoke.ts",
-    "oauth:smoke": "dotenv -e .env.local -- tsx scripts/oauth-smoke.ts"
+    "oauth:smoke": "dotenv -e .env.local -- tsx scripts/oauth-smoke.ts",
+    "ui:e2e": "dotenv -e .env.local -- tsx scripts/ui-e2e.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
