@@ -137,6 +137,10 @@ async function main() {
     const saveOver = await call(A, 'create_carousel', { title: `smoke design overflow ${RUN}`, slides: [{ kind: 'design', name: 'a', html: '<h1 class="t-hook">Smoke cover</h1>' }, OVER, { kind: 'design', name: 'z', html: '<p class="t-title">end</p>' }], render: false });
     if (saveOver.data?.id) carouselIds.add(saveOver.data.id);
     check('saving an overflowing slide is refused', !saveOver.ok, saveOver.text.slice(0, 200));
+    // giant display type: the check measures glyph ink, not the font's (much taller) line box
+    const BIG = { kind: 'design', html: '<div class="n">1</div><p class="t-body">Giant numeral, fully visible</p>', css: '&{padding:72px}.n{font-size:420px;line-height:.8;font-weight:900;margin-top:-20px}' };
+    const pb = await preview(A, BIG);
+    check('giant numeral fully visible: no off-canvas error', pb.ok && !errorsOf(pb).some(e => /canvas/.test(e)), [...errorsOf(pb), ...warningsOf(pb)].join(' | ') || pb.text.slice(0, 200));
 
     // ---- 3. off-brand color + font ----
     const OFF = { kind: 'design', html: '<div class="x">Off brand text here</div>', css: '.x{position:absolute;left:96px;top:200px;font-family:"Comic Sans MS",cursive;font-size:64px;color:#ff00aa}' };

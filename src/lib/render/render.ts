@@ -25,15 +25,26 @@ export function cspMeta(host: string | null) {
 export const lockHtml = (html: string, host: string | null) =>
   html.includes('<head>') ? html.replace('<head>', `<head>${cspMeta(host)}`) : `${cspMeta(host)}${html}`;
 
+// @sparticuz/chromium unpacks its binary to /tmp/chromium on first use. Under Vercel Fluid compute several requests
+// share one instance; two concurrent executablePath() calls both wrote /tmp/chromium while a third launched it, and
+// the launch failed with "spawn ETXTBSY". Unpack ONCE per instance (one shared promise; reset if it fails).
+let serverlessChromium: Promise<{ executablePath: string; args: string[] }> | null = null;
+function getServerlessChromium() {
+  serverlessChromium ??= (async () => {
+    const sparticuz = (await import('@sparticuz/chromium')).default;
+    // --single-process is meant for AWS Lambda. With Playwright contexts + request interception it makes the browser
+    // die mid-render ("Target page, context or browser has been closed"); Vercel functions can run child processes.
+    return { executablePath: await sparticuz.executablePath(), args: sparticuz.args.filter(a => a !== '--single-process') };
+  })().catch(err => { serverlessChromium = null; throw err; });
+  return serverlessChromium;
+}
+
 async function launch(host: string | null): Promise<Browser> {
   // Any hostname other than the asset host resolves to nothing (no DNS lookups, no prefetch leaks).
   const lockArgs = [`--host-resolver-rules=MAP * ~NOTFOUND${host ? `, EXCLUDE ${host}` : ''}`, '--dns-prefetch-disable', '--disable-background-networking'];
   if (process.env.VERCEL) {
-    const sparticuz = (await import('@sparticuz/chromium')).default;
-    // --single-process is meant for AWS Lambda. With Playwright contexts + request interception it makes the browser
-    // die mid-render ("Target page, context or browser has been closed"); Vercel functions can run child processes.
-    const args = sparticuz.args.filter(a => a !== '--single-process');
-    return chromium.launch({ executablePath: await sparticuz.executablePath(), args: [...args, ...lockArgs], headless: true });
+    const { executablePath, args } = await getServerlessChromium();
+    return chromium.launch({ executablePath, args: [...args, ...lockArgs], headless: true });
   }
   // Local dev: use an installed browser (Edge ships with Windows) or CHROME_PATH.
   return process.env.CHROME_PATH
@@ -41,18 +52,37 @@ async function launch(host: string | null): Promise<Browser> {
     : chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : 'chrome', args: lockArgs, headless: true });
 }
 
-/** Browser-level failures (crash, closed target, compositor hiccup) are retried once with a fresh browser. */
-const BROWSER_FLAKE = /has been closed|Target closed|browser has disconnected|crash|Unable to capture screenshot|Protocol error/i;
+/** Browser-level failures (crash, closed target, compositor hiccup, binary busy) are retried once with a fresh browser. */
+const BROWSER_FLAKE = /has been closed|Target closed|browser has disconnected|crash|Unable to capture screenshot|Protocol error|ETXTBSY|EAGAIN/i;
+
+// At most MAX_BROWSERS Chromium processes per server instance; extra renders wait their turn instead of
+// launching side by side (memory pressure on a shared serverless instance, binary contention).
+const MAX_BROWSERS = 2;
+let activeBrowsers = 0;
+const waiting: (() => void)[] = [];
+async function withBrowserSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (activeBrowsers >= MAX_BROWSERS) await new Promise<void>(resolve => waiting.push(resolve));
+  activeBrowsers++;
+  try {
+    return await fn();
+  } finally {
+    activeBrowsers--;
+    waiting.shift()?.();
+  }
+}
 
 /** Renders full HTML pages to 1080x1350 PNGs in one locked-down browser. Pages with lint: true are also checked. */
 export async function renderPages(pages: { html: string; lint: boolean }[], brand: BrandPack): Promise<Rendered[]> {
-  try {
-    return await renderPagesOnce(pages, brand);
-  } catch (err) {
-    if (!BROWSER_FLAKE.test(String(err))) throw err;
-    console.error('render: browser failure, retrying once with a fresh browser:', String(err).slice(0, 300));
-    return renderPagesOnce(pages, brand);
-  }
+  return withBrowserSlot(async () => {
+    try {
+      return await renderPagesOnce(pages, brand);
+    } catch (err) {
+      if (!BROWSER_FLAKE.test(String(err))) throw err;
+      console.error('render: browser failure, retrying once with a fresh browser:', String(err).slice(0, 300));
+      await new Promise(r => setTimeout(r, 250));
+      return renderPagesOnce(pages, brand);
+    }
+  });
 }
 
 async function renderPagesOnce(pages: { html: string; lint: boolean }[], brand: BrandPack): Promise<Rendered[]> {

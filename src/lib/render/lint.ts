@@ -48,6 +48,23 @@ function inPage(o: LintOptions): Lint {
   const opacity = (el: Element | null) => { let v = 1; for (let e = el; e; e = e.parentElement) v *= parseFloat(getComputedStyle(e).opacity || '1'); return v; };
 
   // ---- text and media boxes ----
+  // Range rects cover the font's whole content area (ascent + descent), not the glyphs: a 420px "1" gets ~100px of
+  // empty box above it and was flagged off-canvas while fully visible. Tighten each rect vertically to the INK of the
+  // text in its actual font (canvas measureText: actualBoundingBoxAscent/Descent from the baseline).
+  const measure = document.createElement('canvas').getContext('2d');
+  const inkBox = (r: DOMRect, text: string, cs: CSSStyleDeclaration): Box => {
+    if (!measure) return r;
+    measure.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const m = measure.measureText(text.trim());
+    const fontAscent = m.fontBoundingBoxAscent, fontDescent = m.fontBoundingBoxDescent;
+    if (!(fontAscent > 0) || !(m.actualBoundingBoxAscent >= 0)) return r;
+    // The rect is the content area: its top sits fontAscent above the baseline (scaled if the box differs from the metrics).
+    const k = r.height / (fontAscent + fontDescent || r.height);
+    const baseline = r.top + fontAscent * k;
+    const top = Math.max(r.top, baseline - m.actualBoundingBoxAscent * k);
+    const bottom = Math.min(r.bottom, baseline + Math.max(0, m.actualBoundingBoxDescent) * k);
+    return bottom > top ? { left: r.left, top, right: r.right, bottom } : r;
+  };
   const texts = new Map<Element, Box>();
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const range = document.createRange();
@@ -59,7 +76,7 @@ function inPage(o: LintOptions): Lint {
     if (cs.visibility === 'hidden' || opacity(el) < 0.05) continue;
     range.selectNodeContents(n);
     let box: Box | null = null;
-    for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) box = union(box, r);
+    for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) box = union(box, inkBox(r, n.textContent, cs));
     if (box) texts.set(el, union(texts.get(el) ?? null, box));
   }
   const media = new Map<Element, Box>();
