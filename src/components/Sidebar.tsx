@@ -9,6 +9,7 @@ const I = {
   key: 'M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4',
   palette: 'M12 22a10 10 0 1 1 10-10c0 2.2-1.8 3-4 3h-2a2 2 0 0 0-1 3.7A2 2 0 0 1 12 22zM7.5 10.5h.01M10.5 6.5h.01M15.5 7.5h.01',
   layout: 'M3 3h18v6H3zM3 13h8v8H3zM15 13h6v8h-6z',
+  alert: 'M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
   plus: 'M12 5v14M5 12h14',
   out: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
 };
@@ -16,7 +17,7 @@ const Icon = ({ d }: { d: string }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 );
 
-export function Sidebar({ openRequests, brandName }: { openRequests: number; brandName: string }) {
+export function Sidebar({ openRequests, brandName, recentErrors = 0 }: { openRequests: number; brandName: string; recentErrors?: number }) {
   const path = usePathname();
   const items = [
     { href: '/', label: 'Carousels', icon: I.grid, active: path === '/' || path.startsWith('/c/') },
@@ -24,6 +25,7 @@ export function Sidebar({ openRequests, brandName }: { openRequests: number; bra
     { href: '/agents', label: 'Agents', icon: I.key },
     { href: '/layouts', label: 'Layouts', icon: I.layout },
     { href: '/brand', label: 'Brand', icon: I.palette },
+    { href: '/errors', label: 'Errors', icon: I.alert, badge: recentErrors },
   ];
   return (
     <aside className="sidebar">

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SlideInputs, type Slide } from '@/lib/slides';
 import { resolveSlideInputs } from '@/lib/layouts';
 import * as store from '@/lib/store';
+import { selfCheck } from '@/lib/previews';
 import { agentOf, carouselUrl, defineTool, fail, json } from '@/lib/mcp/define';
 
 export const STATUS = z.enum(['draft', 'review', 'approved', 'posted']);
@@ -61,7 +62,8 @@ export function registerCarouselTools(server: McpServer) {
   }, async (args, ctx) => {
     const slides = (await resolveSlideInputs(args.slides)) as Slide[];
     const r = await store.createCarousel({ ...args, slides, createdBy: agentOf(ctx) });
-    return json({ ...r, url: carouselUrl(r.id) }, { carouselId: r.id });
+    const check = await selfCheck(agentOf(ctx), slides);
+    return json({ ...r, ...(check ? { selfCheck: check } : {}), url: carouselUrl(r.id) }, { carouselId: r.id });
   });
 
   defineTool(server, 'update_carousel', {

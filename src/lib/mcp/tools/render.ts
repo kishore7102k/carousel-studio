@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { del, list, put } from '@vercel/blob';
 import * as store from '@/lib/store';
-import { carouselUrl, defineTool, fail, json } from '@/lib/mcp/define';
+import { recordPreview } from '@/lib/previews';
+import { agentOf, carouselUrl, defineTool, fail, json } from '@/lib/mcp/define';
 import { Slide, SlideInput } from '@/lib/slides';
 import { resolveSlideInputs } from '@/lib/layouts';
 import { previewSlide } from '@/lib/render/design';
@@ -49,7 +50,7 @@ export function registerRenderTools(server: McpServer) {
     }),
     scope: 'read',
     annotations: { readOnlyHint: true },
-  }, async ({ slide, carouselId, n, total }) => {
+  }, async ({ slide, carouselId, n, total }, ctx) => {
     const [resolved] = await resolveSlideInputs([slide]);
     const parsed = Slide.safeParse(resolved);
     if (!parsed.success) return fail(`invalid slide: ${store.zodMessage(parsed.error)}`);
@@ -65,6 +66,7 @@ export function registerRenderTools(server: McpServer) {
     const pos = n ?? 1;
     const t = Math.max(total ?? (count || pos), pos);
     const r = await previewSlide(parsed.data, { n: pos, total: t, tipLabel: tipLabel(brand, tip), brand });
+    await recordPreview(agentOf(ctx), parsed.data);
     let url: string | null = null;
     if (process.env.BLOB_READ_WRITE_TOKEN) {
       await purgeOldPreviews();

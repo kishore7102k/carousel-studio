@@ -5,6 +5,7 @@ import type { BrandPack } from '@/lib/brand';
 import { assetHost } from '@/lib/assets';
 import { slideHtml, W, H } from './html';
 import { lintOptions, lintSlide } from './lint';
+import { logError } from '@/lib/errors';
 
 export type Lint = { errors: string[]; warnings: string[] };
 export type Rendered = { png: Buffer; lint: Lint | null };
@@ -79,6 +80,8 @@ export async function renderPages(pages: { html: string; lint: boolean }[], bran
     } catch (err) {
       if (!BROWSER_FLAKE.test(String(err))) throw err;
       console.error('render: browser failure, retrying once with a fresh browser:', String(err).slice(0, 300));
+      // recovered by the retry below: logged as expected so the Errors page can still show how often it happens
+      await logError({ source: 'render', error: err, detail: { recovered: 'retrying once with a fresh browser', pages: pages.length }, expected: true });
       await new Promise(r => setTimeout(r, 250));
       return renderPagesOnce(pages, brand);
     }

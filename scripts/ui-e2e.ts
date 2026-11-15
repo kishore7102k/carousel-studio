@@ -636,6 +636,20 @@ async function main() {
       await goto(page, '/brand'); // drop the unsaved form state
     });
 
+    // ================= 8b. Errors =================
+    await step('errors: page renders (Unexpected / All) and lists a failed MCP call', async () => {
+      // a caller mistake: purge outside the trash is refused and logged as "expected"
+      const probe = `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, '0').slice(-12)}`;
+      await mcp(adminKey, 'get_carousel', { id: probe }).catch(() => undefined);
+      await goto(page, '/errors');
+      assert((await heading(page)) === 'Errors', 'no Errors heading');
+      assert((await page.locator('main [role=alert]').count()) === 0, 'error loading the log');
+      await goto(page, '/errors?all=1');
+      const logged = await page.locator('details', { hasText: 'get_carousel' }).count();
+      assert(logged > 0, 'the failed get_carousel call is not listed under All');
+      return `${logged} get_carousel entr${logged === 1 ? 'y' : 'ies'} under All`;
+    });
+
     // ================= 9. Layouts =================
     await step('layouts: page renders (empty state or grid)', async () => {
       await goto(page, '/layouts');
@@ -790,6 +804,7 @@ async function cleanup() {
     for (const id of await strayActivity()) activityIds.add(id);
     if (activityIds.size) await db.delete(schema.activity).where(inArray(schema.activity.id, [...activityIds]));
     if (keyNames.size) await db.delete(schema.activity).where(inArray(schema.activity.actor, [...keyNames]));
+    if (keyNames.size) await db.delete(schema.errorLog).where(inArray(schema.errorLog.actor, [...keyNames]));
   } catch (e) { fail('activity', e); }
 }
 

@@ -48,6 +48,16 @@ There are no slide templates. You design every slide of every carousel.
    Then pick a PALETTE for this carousel that fits the concept (3 to 5 colors: background, text, one or two accents, a surface), e.g. amber on near-black for a terminal, signal red on off-white for an editorial, cyan lines on deep blue for a blueprint, warm kraft and ink for a notebook. Do not default to the brand green: it is just one option. Define the palette as CSS variables at the top of EVERY slide's css so it stays consistent, e.g. "&{--bg:#101418;--fg:#f4efe6;--accent:#ffb000;--muted:#8a8f98;background:var(--bg);color:var(--fg)}", and restyle helpers to match (e.g. "mark{background:var(--accent);color:var(--bg)}", ".card{background:...}", ".editor{background:...}"). Write the palette in the first slide's notes too. Keep text readable (WCAG AA contrast is checked).
 3. Plan the sequence: one idea per slide, and choose each slide's layout from its content (a number becomes a hero number, a process becomes steps or a timeline, a trade-off becomes a split, code becomes an annotated editor, a mistake becomes a crossed-out row next to the fix).
 4. Design, preview_slide, look at the image critically, and iterate: hierarchy, balance (no empty bottom half), alignment, breathing room, contrast. Warnings are the floor, not the goal.
+5. Before you save (MANDATORY self-check). preview_slide EVERY slide in its final form and LOOK at the returned image. Answer each question honestly; if any answer is no, fix and preview again:
+   a. Phone test: at a glance on a small screen, is there one clear focal point and is every word readable?
+   b. Balance: no dead empty half or corner; the content fills the slide on purpose.
+   c. Hierarchy: at most 3 text sizes; headline > support > detail is obvious.
+   d. Palette: same carousel palette as the other slides; nothing looks like the default brand green unless the concept chose it.
+   e. Variety: this slide's layout differs from the previous one; the cover is not a "label + big hook" formula.
+   f. Defaults: no footer, highlight, kicker label or keycap that the design doesn't need.
+   g. Copy: one idea, about 25 words or fewer, no em dashes or emoji, technically correct (code runs as shown).
+   Then record it in the slide's notes, e.g. "self-check: ok (fixed empty bottom, larger code)".
+   Saves report "selfCheck" with any slide saved without a preview of that exact design: preview it, look, fix.
 
 Variety rules:
 - Do not reuse the same structure for every carousel. A cover is not always "small label top, big hook bottom": try a giant word, a question, a split, a code fragment, a number, a diagram, a full-bleed color field.

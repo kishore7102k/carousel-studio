@@ -369,6 +369,7 @@ async function main() {
       if (requestIds.size) await db.delete(schema.requests).where(inArray(schema.requests.id, [...requestIds]));
       await db.delete(schema.requests).where(and(eq(schema.requests.kind, 'new'), like(schema.requests.text, `smoke prompt ${RUN}%`)));
       if (keyNames.length) await db.delete(schema.activity).where(inArray(schema.activity.actor, keyNames));
+      if (keyNames.length) await db.delete(schema.errorLog).where(inArray(schema.errorLog.actor, keyNames));
       await db.delete(schema.apiKeys).where(like(schema.apiKeys.name, `smoke-%-${RUN}`));
     } catch (err) { check('cleanup: rows and keys', false, String(err)); }
   }

@@ -381,6 +381,8 @@ async function main() {
       await db.delete(schema.carousels).where(like(schema.carousels.title, `oauth-smoke ${RUN}%`)); // only exists if scope enforcement failed
       await db.delete(schema.activity).where(like(schema.activity.actor, `oauth-smoke-${RUN}-%`));
       if (keyNames.length) await db.delete(schema.activity).where(inArray(schema.activity.actor, keyNames));
+      await db.delete(schema.errorLog).where(like(schema.errorLog.actor, `oauth-smoke-${RUN}-%`));
+      if (keyNames.length) await db.delete(schema.errorLog).where(inArray(schema.errorLog.actor, keyNames));
       await db.delete(schema.apiKeys).where(like(schema.apiKeys.name, `oauth-smoke-${RUN}-%`));
     } catch (err) { check('cleanup', false, String(err)); }
   }

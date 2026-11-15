@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, text, integer, real, jsonb, timestamp, uniqueIndex, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, real, jsonb, timestamp, uniqueIndex, index, boolean } from 'drizzle-orm/pg-core';
 import type { Slide } from '@/lib/slides';
 
 export const carousels = pgTable('carousels', {
@@ -145,3 +145,27 @@ export const layouts = pgTable('layouts', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------- Observability: server errors (MCP tools, pages, route handlers, server actions, renderer) ----------
+// Secrets are redacted before insert (src/lib/errors.ts). "expected" = a user/agent mistake the tool reported
+// clearly (stale version, not found, validation); the Errors page shows unexpected ones by default.
+export const errorLog = pgTable('error_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  source: text('source').notNull(),
+  route: text('route'),
+  tool: text('tool'),
+  actor: text('actor'),
+  message: text('message').notNull(),
+  stack: text('stack'),
+  detail: jsonb('detail').$type<Record<string, unknown> | null>(),
+  carouselId: uuid('carousel_id'),
+  expected: boolean('expected').notNull().default(false),
+}, t => [index('error_log_at').on(t.at)]);
+
+// ---------- Design self-check: which slide designs an agent previewed (so saves can flag unpreviewed slides) ----------
+export const slidePreviews = pgTable('slide_previews', {
+  hash: text('hash').notNull(),
+  actor: text('actor').notNull(),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex('slide_previews_actor_hash').on(t.actor, t.hash), index('slide_previews_at').on(t.at)]);

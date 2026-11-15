@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { z } from 'zod';
 import { logActivity } from '@/lib/store';
+import { logError } from '@/lib/errors';
 import { studioUrl } from '@/lib/url';
 
 export { studioUrl };
@@ -113,6 +114,11 @@ export function defineTool<S extends z.ZodType>(
       try {
         result = await handler(args, ctx);
       } catch (err) {
+        const a = (args ?? {}) as Record<string, unknown>;
+        await logError({
+          source: 'mcp', error: err, tool: name, actor: agentOf(ctx), detail: compactDetail(a),
+          carouselId: typeof a.id === 'string' ? a.id : typeof a.carouselId === 'string' ? a.carouselId : null,
+        });
         return fail(err instanceof Error ? err.message : String(err));
       }
 

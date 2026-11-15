@@ -304,6 +304,7 @@ async function main() {
       await db.delete(schema.layouts).where(like(schema.layouts.name, `smoke-layout-${RUN}`));
       if (assetIds.size) await db.delete(schema.assets).where(inArray(schema.assets.id, [...assetIds]));
       if (keyNames.length) await db.delete(schema.activity).where(inArray(schema.activity.actor, keyNames));
+      if (keyNames.length) await db.delete(schema.errorLog).where(inArray(schema.errorLog.actor, keyNames));
       await db.delete(schema.apiKeys).where(like(schema.apiKeys.name, `smoke-%-${RUN}`));
     } catch (err) { check('cleanup: rows and keys', false, String(err)); }
   }

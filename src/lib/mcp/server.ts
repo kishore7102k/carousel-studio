@@ -4,6 +4,7 @@ import { registerBrandTools } from './tools/brand';
 import { registerCarouselTools } from './tools/carousels';
 import { registerCompatTools } from './tools/compat';
 import { registerDesignSystemTools, registerDesignTools } from './tools/design';
+import { registerErrorTools } from './tools/errors';
 import { registerRenderTools } from './tools/render';
 import { registerRequestTools } from './tools/requests';
 import { registerSlideTools } from './tools/slides';
@@ -17,6 +18,7 @@ export function registerStudio(server: McpServer) {
   registerRequestTools(server);
   registerAccessTools(server);
   registerDesignTools(server);
+  registerErrorTools(server);
   registerDesignSystemTools(server);
   registerCompatTools(server);
 }

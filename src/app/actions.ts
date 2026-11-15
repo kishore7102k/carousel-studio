@@ -8,6 +8,7 @@ import * as store from '@/lib/store';
 import { getBrand, tipLabel } from '@/lib/brand';
 import { previewSlide, templateToDesign } from '@/lib/render/design';
 import { deleteLayout } from '@/lib/layouts';
+import { clearErrors } from '@/lib/errors';
 import type { DesignSlide } from '@/lib/slides';
 
 const HUMAN = 'you';
@@ -132,4 +133,11 @@ export async function removeLayout(name: string) {
   await deleteLayout(name);
   await log('delete_layout', null, { name });
   revalidatePath('/layouts');
+}
+
+export async function clearErrorLog() {
+  const n = await clearErrors();
+  await log('clear_errors', null, { cleared: n });
+  revalidatePath('/errors');
+  revalidatePath('/', 'layout');
 }

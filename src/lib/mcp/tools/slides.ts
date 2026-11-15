@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SlideInput, SlideInputs, type Slide } from '@/lib/slides';
 import { resolveSlideInputs } from '@/lib/layouts';
 import * as store from '@/lib/store';
+import { selfCheck } from '@/lib/previews';
 import { agentOf, carouselUrl, defineTool, fail, json } from '@/lib/mcp/define';
 import { Id, VersionNo } from './carousels';
 
@@ -39,7 +40,8 @@ export function registerSlideTools(server: McpServer) {
   }, async (args, ctx) => {
     const slides = (await resolveSlideInputs(args.slides)) as Slide[];
     const r = await store.updateSlides({ ...args, slides, createdBy: agentOf(ctx) });
-    return json({ ...r, url: carouselUrl(args.id) }, { detail: { version: r.version } });
+    const check = await selfCheck(agentOf(ctx), slides);
+    return json({ ...r, ...(check && !r.unchanged ? { selfCheck: check } : {}), url: carouselUrl(args.id) }, { detail: { version: r.version } });
   });
 
   defineTool(server, 'edit_slide', {
@@ -62,8 +64,9 @@ export function registerSlideTools(server: McpServer) {
       return fail(`slide ${args.slide} is a legacy "${cur.kind}" template and templates were removed: send a full design, e.g. patch { "kind": "design", "html": "…", "css": "…" } (get_slide_source gives its design source to start from)`);
     }
     const r = await store.editSlide({ ...args, createdBy: agentOf(ctx) });
+    const check = r.unchanged ? null : await selfCheck(agentOf(ctx), [r.slides[args.slide - 1]], args.slide);
     return json(
-      out(args.id, r, { slide: { n: args.slide, ...r.slides[args.slide - 1] }, ...(r.dropped.length ? { dropped: r.dropped } : {}) }),
+      out(args.id, r, { slide: { n: args.slide, ...r.slides[args.slide - 1] }, ...(r.dropped.length ? { dropped: r.dropped } : {}), ...(check ? { selfCheck: check } : {}) }),
       { detail: { slide: args.slide, version: r.version } },
     );
   });
@@ -82,7 +85,8 @@ export function registerSlideTools(server: McpServer) {
   }, async (args, ctx) => {
     const [slide] = (await resolveSlideInputs([args.slide])) as Slide[];
     const r = await store.insertSlide({ ...args, slide, createdBy: agentOf(ctx) });
-    return json(out(args.id, r, { inserted: args.at }), { detail: { at: args.at, kind: args.slide.kind, version: r.version } });
+    const check = await selfCheck(agentOf(ctx), [slide], args.at);
+    return json(out(args.id, r, { inserted: args.at, ...(check ? { selfCheck: check } : {}) }), { detail: { at: args.at, kind: args.slide.kind, version: r.version } });
   });
 
   defineTool(server, 'remove_slide', {
